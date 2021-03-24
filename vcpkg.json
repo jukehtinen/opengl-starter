@@ -1,0 +1,15 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg/master/scripts/vcpkg.schema.json",
+  "name": "opengl-starter",
+  "version-string": "0.0.1",
+  "homepage": "https://github.com/jukehtinen/opengl-starter",
+  "description": "OpenGL 4.6 starter project (vcpkg, cmake, glfw, glm, glad...)",
+  "dependencies": [
+    "cgltf",
+    "glad",
+    "glfw3",
+    "glm",
+    "lodepng",
+    "spdlog"
+  ]
+}
