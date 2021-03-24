@@ -30,4 +30,10 @@ jobs:
         buildDirectory: ${{ runner.workspace }}/build
         cmakeBuildType: "Release"
         cmakeAppendedArgs: '-GNinja'
+    
+    - name: Upload artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: ogls-${{ github.sha }}
+        path: ${{ runner.workspace }}/build/*
         
