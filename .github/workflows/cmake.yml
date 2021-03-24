@@ -16,15 +16,10 @@ jobs:
 
     - name: Restore artifacts, or setup vcpkg (do not install any package)
       uses: lukka/run-vcpkg@v6
-      with:
-        # Just install vcpkg for now, do not install any ports in this step yet.
+      with:      
         setupOnly: true
-        # Location of the vcpkg submodule in the Git repository.
-        # vcpkgDirectory: '${{ github.workspace }}/vcpkg'
-        # Since the cache must be invalidated when content of the vcpkg.json file changes, let's
-        # compute its hash and append this to the computed cache's key.
         appendedCacheKey: ${{ hashFiles( '**/vcpkg.json' ) }}
-        vcpkgTriplet: ${{ matrix.triplet }}
+        vcpkgTriplet: "x64-windows"
         additionalCachedPaths: ${{ env.buildDir }}/vcpkg_installed
         vcpkgGitCommitId: "3166bcc15b156b57667d9e573fba9775ceef3eb1"
 
@@ -33,6 +28,6 @@ jobs:
       with:
         useVcpkgToolchainFile: true
         buildDirectory: ${{ runner.workspace }}/build
-        cmakeBuildType: ${{ matrix.buildtype }}
+        cmakeBuildType: "Release"
         cmakeAppendedArgs: '-GNinja'
         
