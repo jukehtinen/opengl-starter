@@ -26,6 +26,7 @@ jobs:
         appendedCacheKey: ${{ hashFiles( '**/vcpkg.json' ) }}
         vcpkgTriplet: ${{ matrix.triplet }}
         additionalCachedPaths: ${{ env.buildDir }}/vcpkg_installed
+        vcpkgGitCommitId: "3166bcc15b156b57667d9e573fba9775ceef3eb1"
 
     - name: Run CMake to install the dependencies specified in the vcpkg.json manifest, generate project file and build the project
       uses: lukka/run-cmake@v3
