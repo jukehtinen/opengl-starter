@@ -4,10 +4,10 @@
 
 namespace opengl_starter
 {
-    class Window
+    struct Window
     {
-    public:
-        Window()
+        Window(int width = 1280, int height = 720)
+            : width(width), height(height)
         {
             glfwSetErrorCallback([](int code, const char* message) { spdlog::error("[glfw] Error = {}, Message = {}", code, message); });
 
@@ -50,7 +50,7 @@ namespace opengl_starter
         }
 
         GLFWwindow* window = nullptr;
-        int width = 1280;
-        int height = 720;
+        int width = 0;
+        int height = 0;
     };
 }
