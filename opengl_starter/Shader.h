@@ -26,7 +26,7 @@ namespace opengl_starter
             glDeleteProgram(fragProg);
         }
 
-        std::string LoadString(const std::string& filename)
+        static std::string LoadString(const std::string& filename)
         {
             std::ifstream stream(filename);
             if (!stream.is_open())
@@ -44,11 +44,11 @@ namespace opengl_starter
             return output;
         }
 
-        GLuint CreateProgram(GLuint type, const std::string& data)
+        static GLuint CreateProgram(GLuint type, const std::string& data)
         {
             const auto ptr = static_cast<const GLchar*>(data.c_str());
 
-            auto prog = glCreateShaderProgramv(type, 1, &ptr);
+            const auto prog = glCreateShaderProgramv(type, 1, &ptr);
 
             GLint logLength;
             glGetProgramiv(prog, GL_INFO_LOG_LENGTH, &logLength);

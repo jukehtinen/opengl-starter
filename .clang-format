@@ -1,0 +1,20 @@
+﻿---
+BasedOnStyle: Microsoft
+AccessModifierOffset: -4
+AlignAfterOpenBracket: DontAlign
+AlignTrailingComments: 'true'
+AlignOperands: 'true'
+AllowShortBlocksOnASingleLine: 'true'
+AllowShortCaseLabelsOnASingleLine: 'true'
+AllowShortLambdasOnASingleLine: All
+SortIncludes: 'true'
+ColumnLimit: 0
+NamespaceIndentation: All
+FixNamespaceComments: 'false'
+PointerAlignment: Left
+IndentWidth: 4
+UseTab: Never
+TabWidth: 4
+BreakStringLiterals: false
+Cpp11BracedListStyle : false
+...

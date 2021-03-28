@@ -1,7 +1,7 @@
 #pragma once
 
 #pragma warning(push)
-#pragma warning(disable:4996) // warning C4996: '...': This function or variable may be unsafe.
+#pragma warning(disable : 4996) // warning C4996: '...': This function or variable may be unsafe.
 #define CGLTF_IMPLEMENTATION
 #include "cgltf.h"
 #pragma warning(pop)
