@@ -6,6 +6,8 @@
 #include "cgltf.h"
 #pragma warning(pop)
 
+#include "Buffer.h"
+
 namespace opengl_starter
 {
     struct Vertex
@@ -76,16 +78,13 @@ namespace opengl_starter
             vertexCount = static_cast<uint32_t>(verts.size());
             indexCount = static_cast<uint32_t>(indices.size());
 
-            glCreateBuffers(1, &vbo);
-            glNamedBufferData(vbo, sizeof(Vertex) * verts.size(), verts.data(), GL_STATIC_DRAW);
-
-            glCreateBuffers(1, &ibo);
-            glNamedBufferData(ibo, sizeof(uint32_t) * indices.size(), indices.data(), GL_STATIC_DRAW);
+            vertexBuffer = std::make_shared<Buffer>(sizeof(Vertex) * verts.size(), verts.data());
+            indexBuffer = std::make_shared<Buffer>(sizeof(uint32_t) * indices.size(), indices.data());
 
             glCreateVertexArrays(1, &vao);
 
-            glVertexArrayVertexBuffer(vao, 0, vbo, 0, sizeof(Vertex));
-            glVertexArrayElementBuffer(vao, ibo);
+            glVertexArrayVertexBuffer(vao, 0, vertexBuffer->buffer, 0, sizeof(Vertex));
+            glVertexArrayElementBuffer(vao, indexBuffer->buffer);
 
             glEnableVertexArrayAttrib(vao, 0);
             glEnableVertexArrayAttrib(vao, 1);
@@ -103,13 +102,11 @@ namespace opengl_starter
         ~Mesh()
         {
             glDeleteVertexArrays(1, &vao);
-            glDeleteBuffers(1, &vbo);
-            glDeleteBuffers(1, &ibo);
         }
 
         GLuint vao = 0;
-        GLuint vbo = 0;
-        GLuint ibo = 0;
+        std::shared_ptr<Buffer> vertexBuffer = nullptr;
+        std::shared_ptr<Buffer> indexBuffer = nullptr;
         uint32_t vertexCount = 0;
         uint32_t indexCount = 0;
     };
