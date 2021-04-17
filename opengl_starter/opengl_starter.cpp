@@ -1,7 +1,9 @@
 ﻿#include "Common.h"
+#include "Font.h"
 #include "Framebuffer.h"
 #include "Mesh.h"
 #include "Shader.h"
+#include "TextRenderer.h"
 #include "Texture.h"
 #include "Window.h"
 
@@ -30,14 +32,29 @@ int main()
 
     opengl_starter::Mesh meshCube("assets/cube.glb");
     opengl_starter::Texture texOpengl("assets/opengl.png");
+    opengl_starter::Texture texFont{ "assets/robotoregular.png" };
+    opengl_starter::Texture texFontMono{ "assets/robotomono.png" };
+
     opengl_starter::Shader shaderCube("assets/cube.vert", "assets/cube.frag");
     opengl_starter::Shader shaderPost("assets/post.vert", "assets/post.frag");
+    opengl_starter::Shader shaderFont("assets/sdf_font.vert", "assets/sdf_font.frag");
+
+    opengl_starter::Font fontRobotoRegular{ "assets/robotoregular.fnt" };
+    opengl_starter::Font fontRobotoMono{ "assets/robotomono.fnt" };
 
     opengl_starter::Texture texColor{ frameWidth, frameHeight, GL_RGBA8 };
     opengl_starter::Texture texDepth{ frameWidth, frameHeight, GL_DEPTH32F_STENCIL8 };
     opengl_starter::Framebuffer framebuffer{
         { { GL_COLOR_ATTACHMENT0, texColor.textureName },
             { GL_DEPTH_STENCIL_ATTACHMENT, texDepth.textureName } }
+    };
+
+    opengl_starter::TextRenderer textRenderer{ &shaderFont, &texFont, &fontRobotoRegular, frameWidth, frameHeight };
+    opengl_starter::TextRenderer textRendererMono{ &shaderFont, &texFontMono, &fontRobotoMono, frameWidth, frameHeight };
+
+    wnd.onResize = [&](int width, int height) {
+        textRenderer.ResizeWindow(width, height);
+        textRendererMono.ResizeWindow(width, height);
     };
 
     // DummyVao for post process step. glDraw cannot draw without bound vao. (todo - or can it somehow?)
@@ -71,6 +88,9 @@ int main()
         // Render
         const float clearColor[4] = { 112.0f / 255.0f, 94.0f / 255.0f, 120.0f / 255.0f, 1.0f };
         const float clearDepth = 1.0f;
+
+        textRenderer.Reset();
+        textRendererMono.Reset();
 
         // Render cube to texture
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.fbo);
@@ -106,6 +126,21 @@ int main()
         glBindVertexArray(dummyVao);
         glDrawArrays(GL_TRIANGLES, 0, 3);
         glBindVertexArray(0);
+
+        // Render some text
+        const auto ipsum = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.";
+
+        auto text1transform = glm::translate(glm::mat4{ 1.0f }, { 5.0f, 5.0f, 0.0f });
+        textRenderer.RenderString(fmt::format("Single line - {}", ipsum), text1transform);
+
+        auto text2transform = glm::translate(glm::mat4{ 1.0f }, { 5.0f, 55.0f, 0.0f });
+        textRenderer.RenderString(fmt::format("Wrapped - {}", ipsum), text2transform, 500.0f);
+
+        auto text3transform = glm::translate(glm::mat4{ 1.0f }, { wnd.width / 2.0f, wnd.height - 60.0f, 0.0f }) * glm::scale(glm::mat4{ 1.0f }, glm::vec3{ 0.6f });
+        textRendererMono.RenderString(fmt::format("Center - {}", ipsum), text3transform, 1500.0f, true);
+
+        auto text4transform = glm::translate(glm::mat4{ 1.0f }, { 5.0f, 250.0f, 0.0f });
+        textRenderer.RenderString(fmt::format("Progress - {}", ipsum), text4transform, 700.0f, false, glm::sin(r / 2.0f));
 
         glfwSwapBuffers(wnd.window);
     }

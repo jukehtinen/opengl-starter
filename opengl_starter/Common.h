@@ -13,6 +13,8 @@
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtc/type_ptr.hpp"
 
+#include "fmt/format.h"
+
 #include "spdlog/spdlog.h"
 
 #pragma warning(pop)

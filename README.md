@@ -20,3 +20,6 @@ OpenGL starter project with `vcpkg, cmake, glfw, glm, glad, gltf, lodepng, etc`.
   ]
 }
 ```
+### Fonts
+
+Font files are generated using [Hiero](https://github.com/libgdx/libgdx/wiki/Distance-field-fonts) tool.
