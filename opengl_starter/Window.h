@@ -41,6 +41,8 @@ namespace opengl_starter
                 auto w = static_cast<Window*>(glfwGetWindowUserPointer(wnd));
                 w->width = width;
                 w->height = height;
+                if (w->onResize)
+                    w->onResize(width, height);
             });
         }
 
@@ -52,5 +54,7 @@ namespace opengl_starter
         GLFWwindow* window = nullptr;
         int width = 0;
         int height = 0;
+
+        std::function<void(int, int)> onResize;
     };
 }
