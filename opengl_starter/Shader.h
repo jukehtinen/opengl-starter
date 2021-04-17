@@ -1,7 +1,6 @@
 #pragma once
 
-#include <fstream>
-#include <streambuf>
+#include "Utils.h"
 
 namespace opengl_starter
 {
@@ -9,8 +8,8 @@ namespace opengl_starter
     {
         Shader(const std::string& vertFile, const std::string& fragFile)
         {
-            vertProg = CreateProgram(GL_VERTEX_SHADER, LoadString(vertFile));
-            fragProg = CreateProgram(GL_FRAGMENT_SHADER, LoadString(fragFile));
+            vertProg = CreateProgram(GL_VERTEX_SHADER, Utils::File::LoadString(vertFile));
+            fragProg = CreateProgram(GL_FRAGMENT_SHADER, Utils::File::LoadString(fragFile));
 
             glGenProgramPipelines(1, &pipeline);
             glBindProgramPipeline(pipeline);
@@ -24,24 +23,6 @@ namespace opengl_starter
             glDeleteProgramPipelines(1, &pipeline);
             glDeleteProgram(vertProg);
             glDeleteProgram(fragProg);
-        }
-
-        static std::string LoadString(const std::string& filename)
-        {
-            std::ifstream stream(filename);
-            if (!stream.is_open())
-            {
-                spdlog::error("[Shader] Failed to load file {}", filename);
-                return "";
-            }
-
-            std::string output;
-            stream.seekg(0, std::ios::end);
-            output.reserve(stream.tellg());
-            stream.seekg(0, std::ios::beg);
-
-            output.assign((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
-            return output;
         }
 
         static GLuint CreateProgram(GLuint type, const std::string& data)
