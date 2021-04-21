@@ -24,12 +24,12 @@ TextRenderer::TextRenderer(opengl_starter::Shader* textShader, opengl_starter::T
     indices.resize(MaxLetters * 6);
     for (auto i = 0; i < MaxLetters; i++)
     {
-        indices[i * 6 + 0] = 3 + 4 * i;
-        indices[i * 6 + 1] = 2 + 4 * i;
+        indices[i * 6 + 1] = 3 + 4 * i;
+        indices[i * 6 + 0] = 2 + 4 * i;
         indices[i * 6 + 2] = 0 + 4 * i;
 
-        indices[i * 6 + 3] = 2 + 4 * i;
-        indices[i * 6 + 4] = 1 + 4 * i;
+        indices[i * 6 + 4] = 2 + 4 * i;
+        indices[i * 6 + 3] = 1 + 4 * i;
         indices[i * 6 + 5] = 0 + 4 * i;
     }
 

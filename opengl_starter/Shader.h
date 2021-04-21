@@ -6,15 +6,25 @@ namespace opengl_starter
 {
     struct Shader
     {
-        Shader(const std::string& vertFile, const std::string& fragFile)
+        Shader(const std::string& vertFile, const std::string& fragFile, const std::string& tesc = "", const std::string& tese = "")
         {
+            glGenProgramPipelines(1, &pipeline);
+            glBindProgramPipeline(pipeline);
+
             vertProg = CreateProgram(GL_VERTEX_SHADER, Utils::File::LoadString(vertFile));
             fragProg = CreateProgram(GL_FRAGMENT_SHADER, Utils::File::LoadString(fragFile));
 
-            glGenProgramPipelines(1, &pipeline);
-            glBindProgramPipeline(pipeline);
             glUseProgramStages(pipeline, GL_VERTEX_SHADER_BIT, vertProg);
             glUseProgramStages(pipeline, GL_FRAGMENT_SHADER_BIT, fragProg);
+
+            if (!tesc.empty())
+            {
+                tescProg = CreateProgram(GL_TESS_CONTROL_SHADER, Utils::File::LoadString(tesc));
+                teseProg = CreateProgram(GL_TESS_EVALUATION_SHADER, Utils::File::LoadString(tese));
+                glUseProgramStages(pipeline, GL_TESS_CONTROL_SHADER_BIT, tescProg);
+                glUseProgramStages(pipeline, GL_TESS_EVALUATION_SHADER_BIT, teseProg);
+            }
+
             glValidateProgramPipeline(pipeline);
         }
 
@@ -33,19 +43,52 @@ namespace opengl_starter
 
             GLint logLength;
             glGetProgramiv(prog, GL_INFO_LOG_LENGTH, &logLength);
+
             if (logLength > 0)
             {
                 std::string output;
                 output.reserve(logLength);
                 glGetProgramInfoLog(prog, logLength, 0, static_cast<GLchar*>(&output[0]));
                 spdlog::error("[Shader] {}", output.c_str());
+
+                DEBUGGER;
             }
+
+            // PrintUniforms(prog);
 
             return prog;
         }
 
+        static void PrintUniforms(GLuint prog)
+        {
+            GLint uniforms = 0;
+            glGetProgramiv(prog, GL_ACTIVE_UNIFORMS, &uniforms);
+
+            if (uniforms > 0)
+            {
+                GLint maxNameLength = 0;
+                glGetProgramiv(prog, GL_ACTIVE_UNIFORM_MAX_LENGTH, &maxNameLength);
+
+                GLsizei length = 0;
+                GLsizei count = 0;
+                GLenum type = GL_NONE;
+                for (GLint i = 0; i < uniforms; ++i)
+                {
+                    std::string name(maxNameLength, '\0');
+                    glGetActiveUniform(prog, i, maxNameLength, &length, &count, &type, name.data());
+                    spdlog::debug("[Shader] Uniform {} {} {}", name, type, count);
+                }
+            }
+            else
+            {
+                spdlog::debug("[Shader] No uniforms found");
+            }
+        }
+
         GLuint vertProg = 0;
         GLuint fragProg = 0;
+        GLuint tescProg = 0;
+        GLuint teseProg = 0;
         GLuint pipeline = 0;
     };
 }

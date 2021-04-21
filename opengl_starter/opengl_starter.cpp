@@ -1,8 +1,11 @@
 ﻿#include "Common.h"
+
+#include "Camera.h"
 #include "Font.h"
 #include "Framebuffer.h"
 #include "Mesh.h"
 #include "Shader.h"
+#include "Terrain.h"
 #include "TextRenderer.h"
 #include "Texture.h"
 #include "Window.h"
@@ -20,6 +23,13 @@ void InitOpenGL()
 
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_MULTISAMPLE);
+
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
+
+    GLint MaxPatchVertices = 0;
+    glGetIntegerv(GL_MAX_PATCH_VERTICES, &MaxPatchVertices);
 }
 
 int main()
@@ -32,10 +42,14 @@ int main()
 
     opengl_starter::Mesh meshCube("assets/cube.glb");
     opengl_starter::Texture texOpengl("assets/opengl.png");
+    opengl_starter::Texture texHeight("assets/gradient.png");
+    opengl_starter::Texture texGreen("assets/green.png");
+    opengl_starter::Texture texBrown("assets/brown.png");
     opengl_starter::Texture texFont{ "assets/robotoregular.png" };
     opengl_starter::Texture texFontMono{ "assets/robotomono.png" };
-
     opengl_starter::Shader shaderCube("assets/cube.vert", "assets/cube.frag");
+    opengl_starter::Shader shaderTerrain("assets/terrain.vert", "assets/terrain.frag");
+    opengl_starter::Shader shaderTerrainTess("assets/terrain_tess.vert", "assets/terrain_tess.frag", "assets/terrain_tess.tesc", "assets/terrain_tess.tese");
     opengl_starter::Shader shaderPost("assets/post.vert", "assets/post.frag");
     opengl_starter::Shader shaderFont("assets/sdf_font.vert", "assets/sdf_font.frag");
 
@@ -44,6 +58,7 @@ int main()
 
     opengl_starter::Texture texColor{ frameWidth, frameHeight, GL_RGBA8 };
     opengl_starter::Texture texDepth{ frameWidth, frameHeight, GL_DEPTH32F_STENCIL8 };
+
     opengl_starter::Framebuffer framebuffer{
         { { GL_COLOR_ATTACHMENT0, texColor.textureName },
             { GL_DEPTH_STENCIL_ATTACHMENT, texDepth.textureName } }
@@ -52,10 +67,17 @@ int main()
     opengl_starter::TextRenderer textRenderer{ &shaderFont, &texFont, &fontRobotoRegular, frameWidth, frameHeight };
     opengl_starter::TextRenderer textRendererMono{ &shaderFont, &texFontMono, &fontRobotoMono, frameWidth, frameHeight };
 
+    opengl_starter::Terrain terrain{ true, &shaderTerrainTess, &texHeight, &texGreen, &texBrown };
+
+    opengl_starter::Camera camera{ wnd.window };
+
     wnd.onResize = [&](int width, int height) {
         textRenderer.ResizeWindow(width, height);
         textRendererMono.ResizeWindow(width, height);
     };
+
+    wnd.onCursorPos = [&](double x, double y) { camera.UpdateMouse(static_cast<float>(x), static_cast<float>(y)); };
+    wnd.onScroll = [&](double x, double y) { camera.UpdateScroll(static_cast<float>(x), static_cast<float>(y)); };
 
     // DummyVao for post process step. glDraw cannot draw without bound vao. (todo - or can it somehow?)
     GLuint dummyVao = 0;
@@ -78,8 +100,12 @@ int main()
         static float r = 0.0f;
         r += delta * 1.0f;
 
-        const glm::mat4 projection = glm::perspective(glm::radians(45.0f), static_cast<float>(frameWidth) / static_cast<float>(frameHeight), 0.1f, 100.0f);
-        const glm::mat4 view = glm::lookAt(glm::vec3{ 7.5f, 3.0f, 0.0f }, { 0.0f, 0.5f, 0.0f }, { 0.0f, 1.0f, 0.0f });
+        camera.Update(delta);
+
+        const glm::vec3 eye{ 7.5f, 3.0f, 0.0f };
+        const glm::mat4 projection = glm::perspective(glm::radians(camera.Fov), static_cast<float>(frameWidth) / static_cast<float>(frameHeight), 0.1f, 100.0f);
+        const glm::mat4 view = camera.GetViewMatrix();
+
         const glm::mat4 model = glm::rotate(glm::mat4{ 1.0f }, glm::sin(r) * glm::pi<float>(), { 0.0f, 1.0f, 0.0f }) *
                                 glm::rotate(glm::mat4{ 1.0f }, glm::sin(-r) * glm::pi<float>(), { 1.0f, 0.0f, 0.0f });
 
@@ -99,6 +125,8 @@ int main()
         glClearNamedFramebufferfv(framebuffer.fbo, GL_DEPTH, 0, &clearDepth);
 
         glViewport(0, 0, frameWidth, frameHeight);
+
+        terrain.Render(projection, view, camera.Position);
 
         glBindProgramPipeline(shaderCube.pipeline);
         glProgramUniformMatrix4fv(shaderCube.vertProg, glGetUniformLocation(shaderCube.vertProg, "vp"), 1, GL_FALSE, glm::value_ptr(projection * view));

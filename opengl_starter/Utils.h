@@ -14,6 +14,7 @@ namespace Utils
             std::ifstream stream(filename);
             if (!stream.is_open())
             {
+                DEBUGGER;
                 spdlog::error("[LoadString] Failed to load file {}", filename);
                 return "";
             }

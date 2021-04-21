@@ -44,6 +44,18 @@ namespace opengl_starter
                 if (w->onResize)
                     w->onResize(width, height);
             });
+
+            glfwSetCursorPosCallback(window, [](GLFWwindow* wnd, double x, double y) {
+                auto w = static_cast<Window*>(glfwGetWindowUserPointer(wnd));
+                if (w->onCursorPos)
+                    w->onCursorPos(x, y);
+            });
+
+            glfwSetScrollCallback(window, [](GLFWwindow* wnd, double x, double y) {
+                auto w = static_cast<Window*>(glfwGetWindowUserPointer(wnd));
+                if (w->onScroll)
+                    w->onScroll(x, y);
+            });
         }
 
         ~Window()
@@ -56,5 +68,7 @@ namespace opengl_starter
         int height = 0;
 
         std::function<void(int, int)> onResize;
+        std::function<void(double, double)> onCursorPos;
+        std::function<void(double, double)> onScroll;
     };
 }

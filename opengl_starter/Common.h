@@ -1,6 +1,9 @@
 #pragma once
 
+#include <array>
 #include <chrono>
+#include <map>
+#include <vector>
 
 #pragma warning(push)
 #pragma warning(disable : 4201) // warning C4201: nonstandard extension used: nameless struct/union
@@ -17,4 +20,8 @@
 
 #include "spdlog/spdlog.h"
 
+#include "fmt/format.h"
+
 #pragma warning(pop)
+
+#define DEBUGGER __debugbreak();
