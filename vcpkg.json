@@ -9,6 +9,7 @@
     "glad",
     "glfw3",
     "glm",
+    "imgui",
     "lodepng",
     "spdlog"
   ]
