@@ -21,14 +21,30 @@ namespace opengl_starter
 
             glCreateTextures(GL_TEXTURE_2D, 1, &textureName);
 
-            glTextureParameteri(textureName, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-            glTextureParameteri(textureName, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            glTextureParameteri(textureName, GL_TEXTURE_WRAP_S, GL_REPEAT);
+            glTextureParameteri(textureName, GL_TEXTURE_WRAP_T, GL_REPEAT);
             glTextureParameteri(textureName, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
             glTextureParameteri(textureName, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
             glTextureStorage2D(textureName, 1, GL_RGBA8, width, height);
 
             glTextureSubImage2D(textureName, 0, 0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, &image[0]);
+
+            glGenerateTextureMipmap(textureName);
+        }
+
+        Texture(int width, int height, void* data)
+        {
+            glCreateTextures(GL_TEXTURE_2D, 1, &textureName);
+
+            glTextureParameteri(textureName, GL_TEXTURE_WRAP_S, GL_REPEAT);
+            glTextureParameteri(textureName, GL_TEXTURE_WRAP_T, GL_REPEAT);
+            glTextureParameteri(textureName, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTextureParameteri(textureName, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+            glTextureStorage2D(textureName, 1, GL_RGBA8, width, height);
+
+            glTextureSubImage2D(textureName, 0, 0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, data);
 
             glGenerateTextureMipmap(textureName);
         }

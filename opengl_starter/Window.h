@@ -56,6 +56,18 @@ namespace opengl_starter
                 if (w->onScroll)
                     w->onScroll(x, y);
             });
+
+            glfwSetKeyCallback(window, [](GLFWwindow* wnd, int key, int scancode, int action, int mods) {
+                auto w = static_cast<Window*>(glfwGetWindowUserPointer(wnd));
+                if (w->onKey)
+                    w->onKey(key, scancode, action, mods);
+            });
+
+            glfwSetCharCallback(window, [](GLFWwindow* wnd, unsigned int chr) {
+                auto w = static_cast<Window*>(glfwGetWindowUserPointer(wnd));
+                if (w->onChar)
+                    w->onChar(chr);
+            });
         }
 
         ~Window()
@@ -70,5 +82,7 @@ namespace opengl_starter
         std::function<void(int, int)> onResize;
         std::function<void(double, double)> onCursorPos;
         std::function<void(double, double)> onScroll;
+        std::function<void(int, int, int, int)> onKey;
+        std::function<void(unsigned int)> onChar;
     };
 }
