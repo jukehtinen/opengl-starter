@@ -10,7 +10,7 @@ out vec4 outColor;
 
 void main(void)
 {
-    vec3 lightPos = vec3(5.0, 5.0, 5.0);
+    vec3 lightPos = vec3(5.0, 50.0, 5.0);
 
     vec3 norm = normalize(Normal);
     vec3 lightDir = normalize(lightPos - FragPos);

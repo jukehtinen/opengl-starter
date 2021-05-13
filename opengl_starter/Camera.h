@@ -10,7 +10,7 @@ namespace opengl_starter
         const float Sensitivity = 0.1f;
         const float FOV = 45.0f;
 
-        Camera(GLFWwindow* window, glm::vec3 position = glm::vec3(0.0f, 0.5f, 0.0f))
+        Camera(GLFWwindow* window, glm::vec3 position = glm::vec3(5.0f, 3.5f, 5.0f))
             : window(window), Position(position)
         {
             UpdateVectors();
@@ -46,6 +46,12 @@ namespace opengl_starter
 
         void UpdateMouse(float xpos, float ypos)
         {
+            if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_2) != GLFW_PRESS)
+            {
+                firstMouse = true;
+                return;
+            }
+
             if (firstMouse)
             {
                 lastX = xpos;

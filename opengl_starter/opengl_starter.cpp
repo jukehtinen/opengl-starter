@@ -4,6 +4,7 @@
 #include "Decal.h"
 #include "Font.h"
 #include "Framebuffer.h"
+#include "GltfLoader.h"
 #include "ImGuiHandler.h"
 #include "Mesh.h"
 #include "Shader.h"
@@ -11,6 +12,8 @@
 #include "TextRenderer.h"
 #include "Texture.h"
 #include "Window.h"
+
+void DrawSceneUI(opengl_starter::Node* node);
 
 void InitOpenGL()
 {
@@ -44,9 +47,19 @@ int main()
 
     InitOpenGL();
 
-    opengl_starter::Mesh meshCube("assets/cube.glb");
-    opengl_starter::Mesh meshUnitCube("assets/unit_cube.glb");
-    opengl_starter::Texture texOpengl("assets/opengl.png");
+    std::vector<opengl_starter::Mesh*> meshes;
+    std::vector<opengl_starter::Mesh*> meshesCube;
+
+    // todo - child nodes are currently allocated and deleted by no one.
+    opengl_starter::Node root{ "root" };
+
+    opengl_starter::GltfLoader::Load("assets/atelier.glb", &root, meshes);
+    opengl_starter::GltfLoader::Load("assets/cube.glb", nullptr, meshes);
+    opengl_starter::GltfLoader::Load("assets/unit_cube.glb", nullptr, meshesCube);
+
+    opengl_starter::Mesh* meshUnitCube = meshesCube[0];
+
+    opengl_starter::Texture texPalette("assets/lospec500-32x.png");
     opengl_starter::Texture texGear("assets/gear.png");
     opengl_starter::Texture texHeight("assets/gradient.png");
     opengl_starter::Texture texGreen("assets/green.png");
@@ -139,7 +152,18 @@ int main()
 
         const float mixValue = glm::sin(r);
 
+        auto transform = [](opengl_starter::Node* n, const glm::mat4& parentTransform, auto& transformRef) -> void {
+            n->model = parentTransform * glm::translate(glm::mat4{ 1.0f }, n->pos) *
+                       glm::mat4_cast(n->rotq) *
+                       glm::scale(glm::mat4{ 1.0f }, n->scale);
+
+            for (auto c : n->children)
+                transformRef(c, n->model, transformRef);
+        };
+        transform(&root, glm::mat4{ 1.0f }, transform);
+
         decal.OnDecalUI();
+        DrawSceneUI(&root);
 
         // Render
         const float clearColor[4] = { 112.0f / 255.0f, 94.0f / 255.0f, 120.0f / 255.0f, 1.0f };
@@ -156,16 +180,25 @@ int main()
 
         glViewport(0, 0, frameWidth, frameHeight);
 
-        terrain.Render(projection, view, camera.Position);
+        // terrain.Render(projection, view, camera.Position);
 
         glBindProgramPipeline(shaderCube.pipeline);
         glProgramUniformMatrix4fv(shaderCube.vertProg, glGetUniformLocation(shaderCube.vertProg, "vp"), 1, GL_FALSE, glm::value_ptr(projection * view));
-        glProgramUniformMatrix4fv(shaderCube.vertProg, glGetUniformLocation(shaderCube.vertProg, "model"), 1, GL_FALSE, glm::value_ptr(model));
-        glProgramUniform1i(shaderCube.fragProg, glGetUniformLocation(shaderCube.fragProg, "texSampler"), 0);
-        glBindTextureUnit(0, texOpengl.textureName);
-        glBindVertexArray(meshCube.vao);
-        glDrawElements(GL_TRIANGLES, meshCube.indexCount, GL_UNSIGNED_INT, nullptr);
-        glBindVertexArray(0);
+
+        auto render = [&shaderCube, &texPalette](opengl_starter::Node* node, auto& renderRef) -> void {
+            if (node->mesh != nullptr)
+            {
+                glProgramUniformMatrix4fv(shaderCube.vertProg, glGetUniformLocation(shaderCube.vertProg, "model"), 1, GL_FALSE, glm::value_ptr(node->model));
+                glProgramUniform1i(shaderCube.fragProg, glGetUniformLocation(shaderCube.fragProg, "texSampler"), 0);
+                glBindTextureUnit(0, texPalette.textureName);
+                glBindVertexArray(node->mesh->vao);
+                glDrawElements(GL_TRIANGLES, node->mesh->indexCount, GL_UNSIGNED_INT, nullptr);
+                glBindVertexArray(0);
+            }
+            for (auto c : node->children)
+                renderRef(c, renderRef);
+        };
+        render(&root, render);
 
         for (const auto& decal : decal.decals)
         {
@@ -190,8 +223,8 @@ int main()
             glProgramUniform4fv(shaderDecal.fragProg, glGetUniformLocation(shaderDecal.fragProg, "decalColor"), 1, glm::value_ptr(decal.color));
             glBindTextureUnit(0, texGear.textureName);
             glBindTextureUnit(1, texDepth.textureName);
-            glBindVertexArray(meshUnitCube.vao);
-            glDrawElements(GL_TRIANGLES, meshUnitCube.indexCount, GL_UNSIGNED_INT, nullptr);
+            glBindVertexArray(meshUnitCube->vao);
+            glDrawElements(GL_TRIANGLES, meshUnitCube->indexCount, GL_UNSIGNED_INT, nullptr);
             glBindVertexArray(0);
             glDepthMask(GL_TRUE);
             glDisable(GL_BLEND);
@@ -235,5 +268,69 @@ int main()
         glfwSwapBuffers(wnd.window);
     }
 
+    for (auto mesh : meshes)
+    {
+        delete mesh;
+    }
+    meshes.clear();
+
     glDeleteVertexArrays(1, &dummyVao);
+}
+
+void DrawSceneUI(opengl_starter::Node* node)
+{
+    static opengl_starter::Node* node_clicked = nullptr;
+
+    ImGui::Begin("Scene");
+
+    if (ImGui::Button("Add"))
+    {
+        auto parent = node_clicked ? node_clicked : node;
+
+        auto n = new opengl_starter::Node{ fmt::format("{}.{}", parent->name, parent->children.size() + 1).c_str() };
+        parent->children.push_back(n);
+    }
+
+    ImGui::BeginChild("scene_tree", ImVec2(0, ImGui::GetWindowHeight() / 2.0f));
+
+    auto createNode = [](opengl_starter::Node* n, bool defaultOpen, auto& createNodeRef) -> void {
+        ImGuiTreeNodeFlags flags = {};
+        if (defaultOpen)
+            flags |= ImGuiTreeNodeFlags_DefaultOpen;
+        if (node_clicked == n)
+            flags |= ImGuiTreeNodeFlags_Selected;
+        if (n->children.size() == 0)
+            flags |= ImGuiTreeNodeFlags_Leaf;
+
+        if (ImGui::TreeNodeEx((void*)(intptr_t)n, flags, fmt::format("{}", n->name).c_str()))
+        {
+            if (ImGui::IsItemClicked())
+                node_clicked = n;
+
+            for (const auto child : n->children)
+            {
+                createNodeRef(child, false, createNodeRef);
+            }
+
+            ImGui::TreePop();
+        }
+    };
+
+    createNode(node, true, createNode);
+
+    ImGui::EndChild();
+
+    if (node_clicked)
+    {
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        ImGui::Text(fmt::format("{} properties", node_clicked->name).c_str());
+        ImGui::DragFloat3("Pos", glm::value_ptr(node_clicked->pos), 0.1f, -1000.0f, 1000.0f);
+        ImGui::DragFloat4("Rot", glm::value_ptr(node_clicked->rotq), 0.1f, -360.0f, 360.0f);
+        ImGui::DragFloat3("Scl", glm::value_ptr(node_clicked->scale), 0.1f, 0.1f, 10.0f);
+    }
+
+    ImGui::End();
 }

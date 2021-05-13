@@ -12,7 +12,8 @@ add_executable (opengl_starter
     "opengl_starter.cpp" 
     "TextRenderer.cpp"
     "Terrain.cpp"
-    "ImGuiHandler.cpp")
+    "ImGuiHandler.cpp" 
+    "GltfLoader.cpp")
 
 set_property(TARGET opengl_starter PROPERTY CXX_STANDARD 17)
 # target_compile_options(opengl_starter PRIVATE /W4 /WX)
