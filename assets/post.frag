@@ -1,16 +1,26 @@
 #version 450 core
 
 layout(binding = 0) uniform sampler2D texSampler;
+layout(binding = 1) uniform sampler2D texAO;
 
 layout(location = 0) in vec2 Uv;
 
-uniform float mixValue;
+uniform bool enableAo = true;
+uniform bool visualizeAo = false;
 
 out vec4 outColor;
 
 void main() 
 {
-	vec4 color = texture(texSampler, Uv);
-	vec4 gray = vec4(vec3(dot(color.rgb, vec3(0.299, 0.587, 0.114))), 1.0);
-	outColor = mix(color, gray, clamp(mixValue, 0.0, 1.0));
+	outColor = texture(texSampler, Uv);
+
+	if (enableAo)
+		outColor *= texture(texAO, Uv).x;
+
+	if (visualizeAo) {
+		float ao = texture(texAO, Uv).x;
+		outColor = vec4(ao, ao, ao, 1.0);
+	}
+
+	outColor.a = 1.0;
 }

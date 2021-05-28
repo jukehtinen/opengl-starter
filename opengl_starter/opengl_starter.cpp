@@ -7,6 +7,7 @@
 #include "GltfLoader.h"
 #include "ImGuiHandler.h"
 #include "Mesh.h"
+#include "SSAO.h"
 #include "Shader.h"
 #include "Terrain.h"
 #include "TextRenderer.h"
@@ -66,10 +67,13 @@ int main()
     opengl_starter::Texture texBrown("assets/brown.png");
     opengl_starter::Texture texFont{ "assets/robotoregular.png" };
     opengl_starter::Texture texFontMono{ "assets/robotomono.png" };
+    auto texNoise = opengl_starter::Texture::CreateNoiseTexture(4, 4);
     opengl_starter::Shader shaderCube("assets/cube.vert", "assets/cube.frag");
     opengl_starter::Shader shaderDecal("assets/decal.vert", "assets/decal.frag");
     opengl_starter::Shader shaderTerrain("assets/terrain.vert", "assets/terrain.frag");
     opengl_starter::Shader shaderTerrainTess("assets/terrain_tess.vert", "assets/terrain_tess.frag", "assets/terrain_tess.tesc", "assets/terrain_tess.tese");
+    opengl_starter::Shader shaderSSAO("assets/ssao.vert", "assets/ssao.frag");
+    opengl_starter::Shader shaderSSAOBlur("assets/blur.vert", "assets/blur.frag");
     opengl_starter::Shader shaderPost("assets/post.vert", "assets/post.frag");
     opengl_starter::Shader shaderFont("assets/sdf_font.vert", "assets/sdf_font.frag");
 
@@ -78,10 +82,26 @@ int main()
 
     opengl_starter::Texture texColor{ frameWidth, frameHeight, GL_RGBA8 };
     opengl_starter::Texture texDepth{ frameWidth, frameHeight, GL_DEPTH32F_STENCIL8 };
+    opengl_starter::Texture texNormals{ frameWidth, frameHeight, GL_RGBA32F };
+    opengl_starter::Texture texSSAO{ frameWidth, frameHeight, GL_RGBA32F };
+    opengl_starter::Texture texSSAOBlur{ frameWidth, frameHeight, GL_RGBA32F };
 
     opengl_starter::Framebuffer framebuffer{
         { { GL_COLOR_ATTACHMENT0, texColor.textureName },
+            { GL_COLOR_ATTACHMENT1, texNormals.textureName },
             { GL_DEPTH_STENCIL_ATTACHMENT, texDepth.textureName } }
+    };
+
+    opengl_starter::Framebuffer framebufferSSAO{
+        {
+            { GL_COLOR_ATTACHMENT0, texSSAO.textureName },
+        }
+    };
+
+    opengl_starter::Framebuffer framebufferSSAOBlur{
+        {
+            { GL_COLOR_ATTACHMENT0, texSSAOBlur.textureName },
+        }
     };
 
     opengl_starter::TextRenderer textRenderer{ &shaderFont, &texFont, &fontRobotoRegular, frameWidth, frameHeight };
@@ -94,6 +114,8 @@ int main()
     opengl_starter::ImGuiHandler imgui{ wnd.window };
 
     opengl_starter::Decals decal;
+
+    opengl_starter::SSAO ssao;
 
     wnd.onResize = [&](int width, int height) {
         textRenderer.ResizeWindow(width, height);
@@ -150,8 +172,6 @@ int main()
         const glm::mat4 model = glm::rotate(glm::mat4{ 1.0f }, glm::sin(r) * glm::pi<float>(), { 0.0f, 1.0f, 0.0f }) *
                                 glm::rotate(glm::mat4{ 1.0f }, glm::sin(-r) * glm::pi<float>(), { 1.0f, 0.0f, 0.0f });
 
-        const float mixValue = glm::sin(r);
-
         auto transform = [](opengl_starter::Node* n, const glm::mat4& parentTransform, auto& transformRef) -> void {
             n->model = parentTransform * glm::translate(glm::mat4{ 1.0f }, n->pos) *
                        glm::mat4_cast(n->rotq) *
@@ -163,10 +183,12 @@ int main()
         transform(&root, glm::mat4{ 1.0f }, transform);
 
         decal.OnDecalUI();
+        ssao.OnUI();
         DrawSceneUI(&root);
 
         // Render
         const float clearColor[4] = { 112.0f / 255.0f, 94.0f / 255.0f, 120.0f / 255.0f, 1.0f };
+        const float clearColor2[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
         const float clearDepth = 1.0f;
 
         textRenderer.Reset();
@@ -175,7 +197,12 @@ int main()
         // Render cube to texture
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.fbo);
 
+        unsigned int attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+        glDrawBuffers(2, attachments);
+
         glClearNamedFramebufferfv(framebuffer.fbo, GL_COLOR, 0, clearColor);
+        glClearNamedFramebufferfv(framebuffer.fbo, GL_COLOR, 1, clearColor2);
+        glClearNamedFramebufferfv(framebuffer.fbo, GL_COLOR, 2, clearColor2);
         glClearNamedFramebufferfv(framebuffer.fbo, GL_DEPTH, 0, &clearDepth);
 
         glViewport(0, 0, frameWidth, frameHeight);
@@ -185,10 +212,11 @@ int main()
         glBindProgramPipeline(shaderCube.pipeline);
         glProgramUniformMatrix4fv(shaderCube.vertProg, glGetUniformLocation(shaderCube.vertProg, "vp"), 1, GL_FALSE, glm::value_ptr(projection * view));
 
-        auto render = [&shaderCube, &texPalette](opengl_starter::Node* node, auto& renderRef) -> void {
+        auto render = [&shaderCube, &texPalette, &view](opengl_starter::Node* node, auto& renderRef) -> void {
             if (node->mesh != nullptr)
             {
                 glProgramUniformMatrix4fv(shaderCube.vertProg, glGetUniformLocation(shaderCube.vertProg, "model"), 1, GL_FALSE, glm::value_ptr(node->model));
+                glProgramUniformMatrix4fv(shaderCube.vertProg, glGetUniformLocation(shaderCube.vertProg, "view"), 1, GL_FALSE, glm::value_ptr(view));
                 glProgramUniform1i(shaderCube.fragProg, glGetUniformLocation(shaderCube.fragProg, "texSampler"), 0);
                 glBindTextureUnit(0, texPalette.textureName);
                 glBindVertexArray(node->mesh->vao);
@@ -231,6 +259,55 @@ int main()
             glEnable(GL_CULL_FACE);
         }
 
+        // ssao
+        glBindFramebuffer(GL_FRAMEBUFFER, framebufferSSAO.fbo);
+
+        unsigned int attachments2[1] = { GL_COLOR_ATTACHMENT0 };
+        glDrawBuffers(1, attachments2);
+
+        glClearNamedFramebufferfv(framebufferSSAO.fbo, GL_COLOR, 0, clearColor2);
+
+        glViewport(0, 0, frameWidth, frameHeight);
+
+        glBindProgramPipeline(shaderSSAO.pipeline);
+        glProgramUniformMatrix4fv(shaderSSAO.fragProg, glGetUniformLocation(shaderSSAO.fragProg, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+        glProgramUniform1f(shaderSSAO.fragProg, glGetUniformLocation(shaderSSAO.fragProg, "radius"), ssao.radius);
+        glProgramUniform1f(shaderSSAO.fragProg, glGetUniformLocation(shaderSSAO.fragProg, "strength"), ssao.strength);
+        glProgramUniform1f(shaderSSAO.fragProg, glGetUniformLocation(shaderSSAO.fragProg, "bias"), ssao.bias);
+        glProgramUniform2fv(shaderSSAO.fragProg, glGetUniformLocation(shaderSSAO.fragProg, "winSize"), 1, glm::value_ptr(glm::vec2{ wnd.width, wnd.height }));
+        glProgramUniform1i(shaderSSAO.fragProg, glGetUniformLocation(shaderSSAO.fragProg, "kernelSize"), ssao.kernelSize);
+        for (int i = 0; i < ssao.kernelSize; ++i)
+            glProgramUniform3fv(shaderSSAO.fragProg, glGetUniformLocation(shaderSSAO.fragProg, fmt::format("sampleSphere[{}]", i).c_str()), 1, glm::value_ptr(ssao.ssaoKernel[i]));
+
+        glProgramUniform1i(shaderSSAO.fragProg, glGetUniformLocation(shaderSSAO.fragProg, "texNormal"), 0);
+        glProgramUniform1i(shaderSSAO.fragProg, glGetUniformLocation(shaderSSAO.fragProg, "texDepth"), 1);
+        glProgramUniform1i(shaderSSAO.fragProg, glGetUniformLocation(shaderSSAO.fragProg, "texNoise"), 2);
+        glBindTextureUnit(0, texNormals.textureName);
+        glBindTextureUnit(1, texDepth.textureName);
+        glBindTextureUnit(2, texNoise->textureName);
+
+        glBindVertexArray(dummyVao);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+        glBindVertexArray(0);
+
+        // ssaoblur
+        glBindFramebuffer(GL_FRAMEBUFFER, framebufferSSAOBlur.fbo);
+
+        glDrawBuffers(1, attachments2);
+
+        glClearNamedFramebufferfv(framebufferSSAOBlur.fbo, GL_COLOR, 0, clearColor2);
+
+        glViewport(0, 0, frameWidth, frameHeight);
+
+        glBindProgramPipeline(shaderSSAOBlur.pipeline);
+        glProgramUniform1i(shaderSSAOBlur.fragProg, glGetUniformLocation(shaderSSAOBlur.fragProg, "texSampler"), 0);
+        glProgramUniform2fv(shaderSSAOBlur.fragProg, glGetUniformLocation(shaderSSAOBlur.fragProg, "winSize"), 1, glm::value_ptr(glm::vec2{ wnd.width, wnd.height }));
+        glBindTextureUnit(0, texSSAO.textureName);
+
+        glBindVertexArray(dummyVao);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+        glBindVertexArray(0);
+
         // Render to screen with post process
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
@@ -240,9 +317,12 @@ int main()
         glViewport(0, 0, wnd.width, wnd.height);
 
         glBindProgramPipeline(shaderPost.pipeline);
-        glProgramUniform1f(shaderPost.fragProg, glGetUniformLocation(shaderPost.fragProg, "mixValue"), 0);
+        glProgramUniform1i(shaderPost.fragProg, glGetUniformLocation(shaderPost.fragProg, "enableAo"), (int)ssao.enableAo);
+        glProgramUniform1i(shaderPost.fragProg, glGetUniformLocation(shaderPost.fragProg, "visualizeAo"), (int)ssao.visualizeAo);
         glProgramUniform1i(shaderPost.fragProg, glGetUniformLocation(shaderPost.fragProg, "texSampler"), 0);
+        glProgramUniform1i(shaderPost.fragProg, glGetUniformLocation(shaderPost.fragProg, "texAO"), 1);
         glBindTextureUnit(0, texColor.textureName);
+        glBindTextureUnit(1, texSSAOBlur.textureName);
 
         glBindVertexArray(dummyVao);
         glDrawArrays(GL_TRIANGLES, 0, 3);

@@ -6,6 +6,7 @@ layout(location = 2) in vec3 Normal;
 
 uniform mat4 vp;
 uniform mat4 model;
+uniform mat4 view;
 
 layout(location = 0) out vec2 outUv;
 layout(location = 1) out vec3 outNormal;
@@ -19,8 +20,9 @@ out gl_PerVertex
 void main(void)
 {
     outUv = Uv;
-    outNormal = mat3(transpose(inverse(model))) * Normal;
-    outFragPos = vec3(model * vec4(Pos, 1.0));
+    outNormal = transpose(inverse(mat3(view * model))) * Normal;
+	vec4 viewPos = view * model * vec4(Pos, 1.0);
+    outFragPos = viewPos.xyz;
 
     gl_Position = vp * model * vec4(Pos, 1.0);
 }
