@@ -9,7 +9,9 @@
       "installRoot": "${projectDir}\\out\\install\\${name}",
       "cmakeCommandArgs": "",
       "buildCommandArgs": "",
-      "ctestCommandArgs": ""
+      "ctestCommandArgs": "",
+      "addressSanitizerEnabled": true,
+      "enableClangTidyCodeAnalysis": true
     },
     {
       "name": "x64-Release",

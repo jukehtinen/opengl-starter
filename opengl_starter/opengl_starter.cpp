@@ -7,6 +7,7 @@
 #include "GltfLoader.h"
 #include "ImGuiHandler.h"
 #include "Mesh.h"
+#include "ParticleSystem.h"
 #include "SSAO.h"
 #include "Shader.h"
 #include "Terrain.h"
@@ -42,14 +43,17 @@ int main()
 {
     spdlog::set_level(spdlog::level::debug);
 
-    const int frameWidth = 1280;
-    const int frameHeight = 720;
+    const int frameWidth = 2560;
+    const int frameHeight = 1440;
     opengl_starter::Window wnd{ frameWidth, frameHeight };
 
     InitOpenGL();
 
     std::vector<opengl_starter::Mesh*> meshes;
     std::vector<opengl_starter::Mesh*> meshesCube;
+
+
+    auto files = Utils::File::GetFiles("assets/particles");
 
     // todo - child nodes are currently allocated and deleted by no one.
     opengl_starter::Node root{ "root" };
@@ -67,6 +71,8 @@ int main()
     opengl_starter::Texture texBrown("assets/brown.png");
     opengl_starter::Texture texFont{ "assets/robotoregular.png" };
     opengl_starter::Texture texFontMono{ "assets/robotomono.png" };
+    opengl_starter::Texture texParticle1{ "assets/particles/flame_01.png" };
+    opengl_starter::Texture texParticle2{ "assets/particles/spark_01.png" };
     auto texNoise = opengl_starter::Texture::CreateNoiseTexture(4, 4);
     opengl_starter::Shader shaderCube("assets/cube.vert", "assets/cube.frag");
     opengl_starter::Shader shaderDecal("assets/decal.vert", "assets/decal.frag");
@@ -117,6 +123,18 @@ int main()
 
     opengl_starter::SSAO ssao;
 
+    // todo - not cleaned up
+    std::vector<opengl_starter::ParticleSystem*> particleSystems;
+    root.RecurseNodes([&particleSystems](opengl_starter::Node* node) {
+        if (node->name.find(".particles") != std::string::npos)
+        {
+            auto ps = new opengl_starter::ParticleSystem{};
+            ps->Load("assets/ps_torch.json", node);
+            ps->Start();
+            particleSystems.push_back(ps);
+        }
+    });
+
     wnd.onResize = [&](int width, int height) {
         textRenderer.ResizeWindow(width, height);
         textRendererMono.ResizeWindow(width, height);
@@ -163,6 +181,9 @@ int main()
         r += delta * 1.0f;
 
         camera.Update(delta);
+        for (auto ps : particleSystems)
+            ps->Update(delta);
+
         imgui.Update(delta);
 
         const glm::vec3 eye{ 7.5f, 3.0f, 0.0f };
@@ -184,6 +205,7 @@ int main()
 
         decal.OnDecalUI();
         ssao.OnUI();
+        particleSystems[0]->OnUI();
         DrawSceneUI(&root);
 
         // Render
@@ -227,6 +249,9 @@ int main()
                 renderRef(c, renderRef);
         };
         render(&root, render);
+
+        for (auto ps : particleSystems)
+            ps->Render(projection, view);
 
         for (const auto& decal : decal.decals)
         {
@@ -371,7 +396,7 @@ void DrawSceneUI(opengl_starter::Node* node)
         parent->children.push_back(n);
     }
 
-    ImGui::BeginChild("scene_tree", ImVec2(0, ImGui::GetWindowHeight() / 2.0f));
+    ImGui::BeginChild("scene_tree");
 
     auto createNode = [](opengl_starter::Node* n, bool defaultOpen, auto& createNodeRef) -> void {
         ImGuiTreeNodeFlags flags = {};
@@ -400,17 +425,21 @@ void DrawSceneUI(opengl_starter::Node* node)
 
     ImGui::EndChild();
 
+    ImGui::End();
+
+    ImGui::Begin("Object");
     if (node_clicked)
     {
         ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Spacing();
 
         ImGui::Text(fmt::format("{} properties", node_clicked->name).c_str());
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
         ImGui::DragFloat3("Pos", glm::value_ptr(node_clicked->pos), 0.1f, -1000.0f, 1000.0f);
         ImGui::DragFloat4("Rot", glm::value_ptr(node_clicked->rotq), 0.1f, -360.0f, 360.0f);
         ImGui::DragFloat3("Scl", glm::value_ptr(node_clicked->scale), 0.1f, 0.1f, 10.0f);
-    }
+    }    
 
     ImGui::End();
 }

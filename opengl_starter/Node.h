@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 namespace opengl_starter
 {
     struct Mesh;
@@ -31,5 +33,29 @@ namespace opengl_starter
 
         Mesh* mesh = nullptr;
         RenderPassFlags renderPassFlags = RenderPassFlags::Mesh;
+
+        Node* FindNode(const std::string& search)
+        {
+            if (name == search)
+                return this;
+
+            for (auto n : children)
+            {
+                auto found = n->FindNode(search);
+                if (found != nullptr)
+                    return found;
+            }
+
+            return nullptr;
+        }
+
+        void RecurseNodes(std::function<void(Node*)> callback)
+        {
+            callback(this);
+            for (auto n : children)
+            {
+                n->RecurseNodes(callback);
+            }
+        }
     };
 }

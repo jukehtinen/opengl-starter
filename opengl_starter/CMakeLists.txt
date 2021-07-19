@@ -5,6 +5,7 @@ find_package(glfw3 CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
 find_package(lodepng CONFIG REQUIRED)
+find_package(nlohmann_json CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 find_path(CGLTF_INCLUDE_DIRS "cgltf.h")
 
@@ -13,7 +14,8 @@ add_executable (opengl_starter
     "TextRenderer.cpp"
     "Terrain.cpp"
     "ImGuiHandler.cpp" 
-    "GltfLoader.cpp")
+    "GltfLoader.cpp"
+    "ParticleSystem.cpp")
 
 set_property(TARGET opengl_starter PROPERTY CXX_STANDARD 17)
 # target_compile_options(opengl_starter PRIVATE /W4 /WX)
@@ -28,6 +30,8 @@ target_link_libraries(opengl_starter PRIVATE
     glm::glm
     imgui::imgui
     lodepng
+    nlohmann_json 
+    nlohmann_json::nlohmann_json
     spdlog::spdlog
     spdlog::spdlog_header_only
 )

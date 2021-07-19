@@ -37,6 +37,8 @@ namespace opengl_starter
             glTextureSubImage2D(textureName, 0, 0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, &image[0]);
 
             glGenerateTextureMipmap(textureName);
+
+            sourceFile = filename;
         }
 
         Texture(int width, int height, void* data)
@@ -98,5 +100,7 @@ namespace opengl_starter
         }
 
         GLuint textureName = 0;
+
+        std::string sourceFile;
     };
 }
