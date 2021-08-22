@@ -245,7 +245,6 @@ int main()
 
         glClearNamedFramebufferfv(framebuffer.fbo, GL_COLOR, 0, clearColor);
         glClearNamedFramebufferfv(framebuffer.fbo, GL_COLOR, 1, clearColor2);
-        glClearNamedFramebufferfv(framebuffer.fbo, GL_COLOR, 2, clearColor2);
         glClearNamedFramebufferfv(framebuffer.fbo, GL_DEPTH, 0, &clearDepth);
 
         glViewport(0, 0, frameWidth, frameHeight);
@@ -253,14 +252,13 @@ int main()
         // terrain.Render(projection, view, camera.Position);
 
         glBindProgramPipeline(shaderCube.pipeline);
-        glProgramUniformMatrix4fv(shaderCube.vertProg, glGetUniformLocation(shaderCube.vertProg, "vp"), 1, GL_FALSE, glm::value_ptr(projection * view));
+            shaderCube.SetMat4("vp", projection * view);
 
         auto render = [&shaderCube, &texPalette, &view](opengl_starter::Node* node, auto& renderRef) -> void {
             if (node->mesh != nullptr)
             {
-                glProgramUniformMatrix4fv(shaderCube.vertProg, glGetUniformLocation(shaderCube.vertProg, "model"), 1, GL_FALSE, glm::value_ptr(node->model));
-                glProgramUniformMatrix4fv(shaderCube.vertProg, glGetUniformLocation(shaderCube.vertProg, "view"), 1, GL_FALSE, glm::value_ptr(view));
-                glProgramUniform1i(shaderCube.fragProg, glGetUniformLocation(shaderCube.fragProg, "texSampler"), 0);
+                    shaderCube.SetMat4("model", node->model);
+                    shaderCube.SetMat4("view", view);
                 glBindTextureUnit(0, texPalette.textureName);
                 glBindVertexArray(node->mesh->vao);
                 glDrawElements(GL_TRIANGLES, node->mesh->indexCount, GL_UNSIGNED_INT, nullptr);
@@ -295,14 +293,16 @@ int main()
             glEnable(GL_BLEND);
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
             glBindProgramPipeline(shaderDecal.pipeline);
-            glProgramUniformMatrix4fv(shaderDecal.vertProg, glGetUniformLocation(shaderDecal.vertProg, "vp"), 1, GL_FALSE, glm::value_ptr(projection * view));
-            glProgramUniformMatrix4fv(shaderDecal.vertProg, glGetUniformLocation(shaderDecal.vertProg, "model"), 1, GL_FALSE, glm::value_ptr(modelDecal));
-            glProgramUniform1i(shaderDecal.fragProg, glGetUniformLocation(shaderDecal.fragProg, "texSampler"), 0);
-            glProgramUniform1i(shaderDecal.fragProg, glGetUniformLocation(shaderDecal.fragProg, "texDepth"), 1);
+
+                shaderDecal.SetMat4("model", modelDecal);
+                shaderDecal.SetMat4("vp", projection * view);
+                /*shaderDecal.SetMat4("invView", glm::inverse(view));
+                shaderDecal.SetMat4("invProj", glm::inverse(projection));
+                shaderDecal.SetMat4("invModel", glm::inverse(modelDecal));*/
+                shaderDecal.SetVec4("decalColor", decal.color);
             glProgramUniformMatrix4fv(shaderDecal.fragProg, glGetUniformLocation(shaderDecal.fragProg, "invView"), 1, GL_FALSE, glm::value_ptr(glm::inverse(view)));
             glProgramUniformMatrix4fv(shaderDecal.fragProg, glGetUniformLocation(shaderDecal.fragProg, "invProj"), 1, GL_FALSE, glm::value_ptr(glm::inverse(projection)));
             glProgramUniformMatrix4fv(shaderDecal.fragProg, glGetUniformLocation(shaderDecal.fragProg, "invModel"), 1, GL_FALSE, glm::value_ptr(glm::inverse(modelDecal)));
-            glProgramUniform4fv(shaderDecal.fragProg, glGetUniformLocation(shaderDecal.fragProg, "decalColor"), 1, glm::value_ptr(decal.color));
             glBindTextureUnit(0, texGear.textureName);
             glBindTextureUnit(1, texDepth.textureName);
             glBindVertexArray(meshUnitCube->vao);
@@ -330,17 +330,16 @@ int main()
 
         glBindProgramPipeline(shaderSSAO.pipeline);
         glProgramUniformMatrix4fv(shaderSSAO.fragProg, glGetUniformLocation(shaderSSAO.fragProg, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
-        glProgramUniform1f(shaderSSAO.fragProg, glGetUniformLocation(shaderSSAO.fragProg, "radius"), ssao.radius);
-        glProgramUniform1f(shaderSSAO.fragProg, glGetUniformLocation(shaderSSAO.fragProg, "strength"), ssao.strength);
-        glProgramUniform1f(shaderSSAO.fragProg, glGetUniformLocation(shaderSSAO.fragProg, "bias"), ssao.bias);
-        glProgramUniform2fv(shaderSSAO.fragProg, glGetUniformLocation(shaderSSAO.fragProg, "winSize"), 1, glm::value_ptr(glm::vec2{ wnd.width, wnd.height }));
-        glProgramUniform1i(shaderSSAO.fragProg, glGetUniformLocation(shaderSSAO.fragProg, "kernelSize"), ssao.kernelSize);
+
+            shaderSSAO.SetFloat("radius", ssao.radius);
+            shaderSSAO.SetFloat("strength", ssao.strength);
+            shaderSSAO.SetFloat("bias", ssao.bias);
+            shaderSSAO.SetVec2("winSize", { wnd.width, wnd.height });
+            shaderSSAO.SetInt("kernelSize", ssao.kernelSize);
+
         for (int i = 0; i < ssao.kernelSize; ++i)
             glProgramUniform3fv(shaderSSAO.fragProg, glGetUniformLocation(shaderSSAO.fragProg, fmt::format("sampleSphere[{}]", i).c_str()), 1, glm::value_ptr(ssao.ssaoKernel[i]));
 
-        glProgramUniform1i(shaderSSAO.fragProg, glGetUniformLocation(shaderSSAO.fragProg, "texNormal"), 0);
-        glProgramUniform1i(shaderSSAO.fragProg, glGetUniformLocation(shaderSSAO.fragProg, "texDepth"), 1);
-        glProgramUniform1i(shaderSSAO.fragProg, glGetUniformLocation(shaderSSAO.fragProg, "texNoise"), 2);
         glBindTextureUnit(0, texNormals.textureName);
         glBindTextureUnit(1, texDepth.textureName);
         glBindTextureUnit(2, texNoise->textureName);
@@ -359,8 +358,7 @@ int main()
         glViewport(0, 0, frameWidth, frameHeight);
 
         glBindProgramPipeline(shaderSSAOBlur.pipeline);
-        glProgramUniform1i(shaderSSAOBlur.fragProg, glGetUniformLocation(shaderSSAOBlur.fragProg, "texSampler"), 0);
-        glProgramUniform2fv(shaderSSAOBlur.fragProg, glGetUniformLocation(shaderSSAOBlur.fragProg, "winSize"), 1, glm::value_ptr(glm::vec2{ wnd.width, wnd.height }));
+            shaderSSAOBlur.SetVec2("winSize", { wnd.width, wnd.height });
         glBindTextureUnit(0, texSSAO.textureName);
 
         glBindVertexArray(dummyVao);
@@ -380,12 +378,13 @@ int main()
         glViewport(0, 0, wnd.width, wnd.height);
 
         glBindProgramPipeline(shaderPost.pipeline);
-        glProgramUniform1i(shaderPost.fragProg, glGetUniformLocation(shaderPost.fragProg, "enableAo"), (int)ssao.enableAo);
-        glProgramUniform1i(shaderPost.fragProg, glGetUniformLocation(shaderPost.fragProg, "visualizeAo"), (int)ssao.visualizeAo);
-        glProgramUniform1i(shaderPost.fragProg, glGetUniformLocation(shaderPost.fragProg, "texSampler"), 0);
-        glProgramUniform1i(shaderPost.fragProg, glGetUniformLocation(shaderPost.fragProg, "texAO"), 1);
+            shaderPost.SetInt("enableAo", (int)ssao.enableAo);
+            shaderPost.SetInt("visualizeAo", (int)ssao.visualizeAo);
+            shaderPost.SetInt("enableBloom", (int)bloom.enable);
+            shaderPost.SetInt("visualizeBloom", (int)bloom.visualize);
         glBindTextureUnit(0, texColor.textureName);
         glBindTextureUnit(1, texSSAOBlur.textureName);
+            glBindTextureUnit(2, texBloom.textureName);
 
         glBindVertexArray(dummyVao);
         glDrawArrays(GL_TRIANGLES, 0, 3);

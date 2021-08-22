@@ -144,8 +144,7 @@ namespace opengl_starter
     void TextRenderer::Render(const glm::mat4& model, int characterStart, int characters)
     {
         glBindProgramPipeline(_textShader->pipeline);
-        glProgramUniformMatrix4fv(_textShader->vertProg, glGetUniformLocation(_textShader->vertProg, "mvp"), 1, GL_FALSE, glm::value_ptr(_projMatrix * model));
-        glProgramUniform1i(_textShader->fragProg, glGetUniformLocation(_textShader->fragProg, "texSampler"), 0);
+        _textShader->SetMat4("mvp", _projMatrix * model);
         glBindTextureUnit(0, _textTexture->textureName);
 
         glDisable(GL_DEPTH_TEST);

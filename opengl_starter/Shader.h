@@ -35,6 +35,31 @@ namespace opengl_starter
             glDeleteProgram(fragProg);
         }
 
+        void SetFloat(const std::string& uniform, float value)
+        {
+            glProgramUniform1f(fragProg, glGetUniformLocation(fragProg, uniform.c_str()), value);
+        }
+
+        void SetInt(const std::string& uniform, int value)
+        {
+            glProgramUniform1i(fragProg, glGetUniformLocation(fragProg, uniform.c_str()), value);
+        }
+
+        void SetMat4(const std::string& uniform, const glm::mat4& value)
+        {
+            glProgramUniformMatrix4fv(vertProg, glGetUniformLocation(vertProg, uniform.c_str()), 1, GL_FALSE, glm::value_ptr(value));
+        }
+
+        void SetVec2(const std::string& uniform, const glm::vec2& value)
+        {
+            glProgramUniform2fv(fragProg, glGetUniformLocation(fragProg, uniform.c_str()), 1, glm::value_ptr(value));
+        }
+
+        void SetVec4(const std::string& uniform, const glm::vec4& value)
+        {
+            glProgramUniform4fv(fragProg, glGetUniformLocation(fragProg, uniform.c_str()), 1, glm::value_ptr(value));
+        }
+
         static GLuint CreateProgram(GLuint type, const std::string& data)
         {
             const auto ptr = static_cast<const GLchar*>(data.c_str());
