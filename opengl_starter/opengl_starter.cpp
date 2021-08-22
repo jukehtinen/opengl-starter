@@ -1,5 +1,6 @@
-#include "Common.h"
+﻿#include "Common.h"
 
+#include "Bloom.h"
 #include "Camera.h"
 #include "Decal.h"
 #include "Font.h"
@@ -97,17 +98,21 @@ int main()
     opengl_starter::Shader shaderTerrainTess("assets/terrain_tess.vert", "assets/terrain_tess.frag", "assets/terrain_tess.tesc", "assets/terrain_tess.tese");
     opengl_starter::Shader shaderSSAO("assets/ssao.vert", "assets/ssao.frag");
     opengl_starter::Shader shaderSSAOBlur("assets/blur.vert", "assets/blur.frag");
+    opengl_starter::Shader shaderBloomExtract("assets/bloom-extract-brights.vert", "assets/bloom-extract-brights.frag");
     opengl_starter::Shader shaderPost("assets/post.vert", "assets/post.frag");
     opengl_starter::Shader shaderFont("assets/sdf_font.vert", "assets/sdf_font.frag");
+    opengl_starter::Shader shaderGaussianBlur("assets/gaussian-blur.vert", "assets/gaussian-blur.frag");
 
     opengl_starter::Font fontRobotoRegular{ "assets/robotoregular.fnt" };
     opengl_starter::Font fontRobotoMono{ "assets/robotomono.fnt" };
 
-    opengl_starter::Texture texColor{ frameWidth, frameHeight, GL_RGBA8 };
+    opengl_starter::Texture texColor{ frameWidth, frameHeight, GL_RGBA8 }; // GL_R11F_G11F_B10F
     opengl_starter::Texture texDepth{ frameWidth, frameHeight, GL_DEPTH32F_STENCIL8 };
     opengl_starter::Texture texNormals{ frameWidth, frameHeight, GL_RGBA32F };
     opengl_starter::Texture texSSAO{ frameWidth, frameHeight, GL_RGBA32F };
     opengl_starter::Texture texSSAOBlur{ frameWidth, frameHeight, GL_RGBA32F };
+    opengl_starter::Texture texBloom{ frameWidth / 4, frameHeight / 4, GL_RGBA8 };
+    opengl_starter::Texture texBloomBlur{ frameWidth / 4, frameHeight / 4, GL_RGBA8 };
 
     opengl_starter::Framebuffer framebuffer{
         { { GL_COLOR_ATTACHMENT0, texColor.textureName },
@@ -127,6 +132,18 @@ int main()
         }
     };
 
+    opengl_starter::Framebuffer framebufferBloom{
+        {
+            { GL_COLOR_ATTACHMENT0, texBloom.textureName },
+        }
+    };
+
+    opengl_starter::Framebuffer framebufferBloomBlur{
+        {
+            { GL_COLOR_ATTACHMENT0, texBloomBlur.textureName },
+        }
+    };
+
     opengl_starter::TextRenderer textRenderer{ &shaderFont, &texFont, &fontRobotoRegular, frameWidth, frameHeight };
     opengl_starter::TextRenderer textRendererMono{ &shaderFont, &texFontMono, &fontRobotoMono, frameWidth, frameHeight };
 
@@ -139,6 +156,7 @@ int main()
     opengl_starter::Decals decal;
 
     opengl_starter::SSAO ssao;
+    opengl_starter::Bloom bloom;
 
     // todo - not cleaned up
     std::vector<opengl_starter::ParticleSystem*> particleSystems;
@@ -222,6 +240,7 @@ int main()
 
         decal.OnDecalUI();
         ssao.OnUI();
+        bloom.OnUI();
         particleSystems[0]->OnUI();
         DrawSceneUI(&root);
 
@@ -237,62 +256,62 @@ int main()
         {
             DebugGroupScope debugScope{ "Scene" };
 
-        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.fbo);
+            glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.fbo);
 
-        unsigned int attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+            unsigned int attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
 
             glNamedFramebufferDrawBuffers(framebuffer.fbo, 2, attachments);
 
-        glClearNamedFramebufferfv(framebuffer.fbo, GL_COLOR, 0, clearColor);
-        glClearNamedFramebufferfv(framebuffer.fbo, GL_COLOR, 1, clearColor2);
-        glClearNamedFramebufferfv(framebuffer.fbo, GL_DEPTH, 0, &clearDepth);
+            glClearNamedFramebufferfv(framebuffer.fbo, GL_COLOR, 0, clearColor);
+            glClearNamedFramebufferfv(framebuffer.fbo, GL_COLOR, 1, clearColor2);
+            glClearNamedFramebufferfv(framebuffer.fbo, GL_DEPTH, 0, &clearDepth);
 
-        glViewport(0, 0, frameWidth, frameHeight);
+            glViewport(0, 0, frameWidth, frameHeight);
 
-        // terrain.Render(projection, view, camera.Position);
+            // terrain.Render(projection, view, camera.Position);
 
-        glBindProgramPipeline(shaderCube.pipeline);
+            glBindProgramPipeline(shaderCube.pipeline);
             shaderCube.SetMat4("vp", projection * view);
 
-        auto render = [&shaderCube, &texPalette, &view](opengl_starter::Node* node, auto& renderRef) -> void {
-            if (node->mesh != nullptr)
-            {
+            auto render = [&shaderCube, &texPalette, &view](opengl_starter::Node* node, auto& renderRef) -> void {
+                if (node->mesh != nullptr)
+                {
                     shaderCube.SetMat4("model", node->model);
                     shaderCube.SetMat4("view", view);
-                glBindTextureUnit(0, texPalette.textureName);
-                glBindVertexArray(node->mesh->vao);
-                glDrawElements(GL_TRIANGLES, node->mesh->indexCount, GL_UNSIGNED_INT, nullptr);
-                glBindVertexArray(0);
-            }
-            for (auto c : node->children)
-                renderRef(c, renderRef);
-        };
-        render(&root, render);
+                    glBindTextureUnit(0, texPalette.textureName);
+                    glBindVertexArray(node->mesh->vao);
+                    glDrawElements(GL_TRIANGLES, node->mesh->indexCount, GL_UNSIGNED_INT, nullptr);
+                    glBindVertexArray(0);
+                }
+                for (auto c : node->children)
+                    renderRef(c, renderRef);
+            };
+            render(&root, render);
         }
 
         // PS
         {
             DebugGroupScope debugScope{ "PS" };
-        for (auto ps : particleSystems)
-            ps->Render(projection, view);
+            for (auto ps : particleSystems)
+                ps->Render(projection, view);
         }
 
         // Decals
         {
             DebugGroupScope debugScope{ "Decals" };
-        for (const auto& decal : decal.decals)
-        {
-            const glm::mat4 modelDecal = glm::translate(glm::mat4{ 1.0f }, decal.pos) *
-                                         glm::rotate(glm::mat4{ 1.0f }, glm::radians(decal.rot.y), { 0.0f, 1.0f, 0.0f }) *
-                                         glm::rotate(glm::mat4{ 1.0f }, glm::radians(decal.rot.z), { 0.0f, 0.0f, 1.0f }) *
-                                         glm::rotate(glm::mat4{ 1.0f }, glm::radians(decal.rot.x), { 1.0f, 0.0f, 0.0f }) *
-                                         glm::scale(glm::mat4{ 1.0f }, decal.scale);
+            for (const auto& decal : decal.decals)
+            {
+                const glm::mat4 modelDecal = glm::translate(glm::mat4{ 1.0f }, decal.pos) *
+                                             glm::rotate(glm::mat4{ 1.0f }, glm::radians(decal.rot.y), { 0.0f, 1.0f, 0.0f }) *
+                                             glm::rotate(glm::mat4{ 1.0f }, glm::radians(decal.rot.z), { 0.0f, 0.0f, 1.0f }) *
+                                             glm::rotate(glm::mat4{ 1.0f }, glm::radians(decal.rot.x), { 1.0f, 0.0f, 0.0f }) *
+                                             glm::scale(glm::mat4{ 1.0f }, decal.scale);
 
-            glDisable(GL_CULL_FACE);
-            glDepthMask(GL_FALSE);
-            glEnable(GL_BLEND);
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-            glBindProgramPipeline(shaderDecal.pipeline);
+                glDisable(GL_CULL_FACE);
+                glDepthMask(GL_FALSE);
+                glEnable(GL_BLEND);
+                glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+                glBindProgramPipeline(shaderDecal.pipeline);
 
                 shaderDecal.SetMat4("model", modelDecal);
                 shaderDecal.SetMat4("vp", projection * view);
@@ -300,18 +319,78 @@ int main()
                 shaderDecal.SetMat4("invProj", glm::inverse(projection));
                 shaderDecal.SetMat4("invModel", glm::inverse(modelDecal));*/
                 shaderDecal.SetVec4("decalColor", decal.color);
-            glProgramUniformMatrix4fv(shaderDecal.fragProg, glGetUniformLocation(shaderDecal.fragProg, "invView"), 1, GL_FALSE, glm::value_ptr(glm::inverse(view)));
-            glProgramUniformMatrix4fv(shaderDecal.fragProg, glGetUniformLocation(shaderDecal.fragProg, "invProj"), 1, GL_FALSE, glm::value_ptr(glm::inverse(projection)));
-            glProgramUniformMatrix4fv(shaderDecal.fragProg, glGetUniformLocation(shaderDecal.fragProg, "invModel"), 1, GL_FALSE, glm::value_ptr(glm::inverse(modelDecal)));
-            glBindTextureUnit(0, texGear.textureName);
-            glBindTextureUnit(1, texDepth.textureName);
-            glBindVertexArray(meshUnitCube->vao);
-            glDrawElements(GL_TRIANGLES, meshUnitCube->indexCount, GL_UNSIGNED_INT, nullptr);
-            glBindVertexArray(0);
-            glDepthMask(GL_TRUE);
-            glDisable(GL_BLEND);
-            glEnable(GL_CULL_FACE);
+                glProgramUniformMatrix4fv(shaderDecal.fragProg, glGetUniformLocation(shaderDecal.fragProg, "invView"), 1, GL_FALSE, glm::value_ptr(glm::inverse(view)));
+                glProgramUniformMatrix4fv(shaderDecal.fragProg, glGetUniformLocation(shaderDecal.fragProg, "invProj"), 1, GL_FALSE, glm::value_ptr(glm::inverse(projection)));
+                glProgramUniformMatrix4fv(shaderDecal.fragProg, glGetUniformLocation(shaderDecal.fragProg, "invModel"), 1, GL_FALSE, glm::value_ptr(glm::inverse(modelDecal)));
+                glBindTextureUnit(0, texGear.textureName);
+                glBindTextureUnit(1, texDepth.textureName);
+                glBindVertexArray(meshUnitCube->vao);
+                glDrawElements(GL_TRIANGLES, meshUnitCube->indexCount, GL_UNSIGNED_INT, nullptr);
+                glBindVertexArray(0);
+                glDepthMask(GL_TRUE);
+                glDisable(GL_BLEND);
+                glEnable(GL_CULL_FACE);
+            }
         }
+
+        // bloom
+        if (bloom.enable)
+        {
+            DebugGroupScope debugScope{ "bloom" };
+
+            glBindFramebuffer(GL_FRAMEBUFFER, framebufferBloom.fbo);
+            unsigned int attachments3[1] = { GL_COLOR_ATTACHMENT0 };
+            glNamedFramebufferDrawBuffers(framebufferBloom.fbo, 1, attachments3);
+
+            glClearNamedFramebufferfv(framebufferBloom.fbo, GL_COLOR, 0, clearColor2);
+            glViewport(0, 0, frameWidth / 4, frameHeight / 4);
+
+            glBindProgramPipeline(shaderBloomExtract.pipeline);
+            shaderBloomExtract.SetFloat("threshold", bloom.threshold);
+
+            glBindTextureUnit(0, texColor.textureName);
+
+            glBindVertexArray(dummyVao);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+            glBindVertexArray(0);
+
+            // bloomblur x
+            glBindFramebuffer(GL_FRAMEBUFFER, framebufferBloomBlur.fbo);
+            unsigned int bloomblurattach[1] = { GL_COLOR_ATTACHMENT0 };
+            glNamedFramebufferDrawBuffers(framebufferBloomBlur.fbo, 1, bloomblurattach);
+
+            glClearNamedFramebufferfv(framebufferBloomBlur.fbo, GL_COLOR, 0, clearColor2);
+
+            glViewport(0, 0, frameWidth / 4, frameHeight / 4);
+
+            glBindProgramPipeline(shaderGaussianBlur.pipeline);
+            shaderGaussianBlur.SetVec2("winSize", glm::vec2{ wnd.width / 4, wnd.height / 4 });
+            shaderGaussianBlur.SetVec2("direction", { 1.0f, 0.0f });
+
+            glBindTextureUnit(0, texBloom.textureName);
+
+            glBindVertexArray(dummyVao);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+            glBindVertexArray(0);
+
+            // bloomblur y
+            glBindFramebuffer(GL_FRAMEBUFFER, framebufferBloom.fbo);
+            unsigned int bloomblurattach2[1] = { GL_COLOR_ATTACHMENT0 };
+            glNamedFramebufferDrawBuffers(framebufferBloom.fbo, 1, bloomblurattach2);
+
+            glClearNamedFramebufferfv(framebufferBloom.fbo, GL_COLOR, 0, clearColor2);
+
+            glViewport(0, 0, frameWidth / 4, frameHeight / 4);
+
+            glBindProgramPipeline(shaderGaussianBlur.pipeline);
+            shaderGaussianBlur.SetVec2("winSize", glm::vec2{ wnd.width / 4, wnd.height / 4 });
+            shaderGaussianBlur.SetVec2("direction", { 0.0f, 1.0f });
+
+            glBindTextureUnit(0, texBloomBlur.textureName);
+
+            glBindVertexArray(dummyVao);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+            glBindVertexArray(0);
         }
 
         // ssao
@@ -319,17 +398,17 @@ int main()
         {
             DebugGroupScope debugScope{ "ssao" };
 
-        glBindFramebuffer(GL_FRAMEBUFFER, framebufferSSAO.fbo);
+            glBindFramebuffer(GL_FRAMEBUFFER, framebufferSSAO.fbo);
 
-        unsigned int attachments2[1] = { GL_COLOR_ATTACHMENT0 };
+            unsigned int attachments2[1] = { GL_COLOR_ATTACHMENT0 };
             glNamedFramebufferDrawBuffers(framebufferSSAO.fbo, 1, attachments2);
 
-        glClearNamedFramebufferfv(framebufferSSAO.fbo, GL_COLOR, 0, clearColor2);
+            glClearNamedFramebufferfv(framebufferSSAO.fbo, GL_COLOR, 0, clearColor2);
 
-        glViewport(0, 0, frameWidth, frameHeight);
+            glViewport(0, 0, frameWidth, frameHeight);
 
-        glBindProgramPipeline(shaderSSAO.pipeline);
-        glProgramUniformMatrix4fv(shaderSSAO.fragProg, glGetUniformLocation(shaderSSAO.fragProg, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+            glBindProgramPipeline(shaderSSAO.pipeline);
+            glProgramUniformMatrix4fv(shaderSSAO.fragProg, glGetUniformLocation(shaderSSAO.fragProg, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
 
             shaderSSAO.SetFloat("radius", ssao.radius);
             shaderSSAO.SetFloat("strength", ssao.strength);
@@ -337,82 +416,82 @@ int main()
             shaderSSAO.SetVec2("winSize", { wnd.width, wnd.height });
             shaderSSAO.SetInt("kernelSize", ssao.kernelSize);
 
-        for (int i = 0; i < ssao.kernelSize; ++i)
-            glProgramUniform3fv(shaderSSAO.fragProg, glGetUniformLocation(shaderSSAO.fragProg, fmt::format("sampleSphere[{}]", i).c_str()), 1, glm::value_ptr(ssao.ssaoKernel[i]));
+            for (int i = 0; i < ssao.kernelSize; ++i)
+                glProgramUniform3fv(shaderSSAO.fragProg, glGetUniformLocation(shaderSSAO.fragProg, fmt::format("sampleSphere[{}]", i).c_str()), 1, glm::value_ptr(ssao.ssaoKernel[i]));
 
-        glBindTextureUnit(0, texNormals.textureName);
-        glBindTextureUnit(1, texDepth.textureName);
-        glBindTextureUnit(2, texNoise->textureName);
+            glBindTextureUnit(0, texNormals.textureName);
+            glBindTextureUnit(1, texDepth.textureName);
+            glBindTextureUnit(2, texNoise->textureName);
 
-        glBindVertexArray(dummyVao);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
-        glBindVertexArray(0);
+            glBindVertexArray(dummyVao);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+            glBindVertexArray(0);
 
-        // ssaoblur
-        glBindFramebuffer(GL_FRAMEBUFFER, framebufferSSAOBlur.fbo);
+            // ssaoblur
+            glBindFramebuffer(GL_FRAMEBUFFER, framebufferSSAOBlur.fbo);
 
             glNamedFramebufferDrawBuffers(framebufferSSAOBlur.fbo, 1, attachments2);
 
-        glClearNamedFramebufferfv(framebufferSSAOBlur.fbo, GL_COLOR, 0, clearColor2);
+            glClearNamedFramebufferfv(framebufferSSAOBlur.fbo, GL_COLOR, 0, clearColor2);
 
-        glViewport(0, 0, frameWidth, frameHeight);
+            glViewport(0, 0, frameWidth, frameHeight);
 
-        glBindProgramPipeline(shaderSSAOBlur.pipeline);
+            glBindProgramPipeline(shaderSSAOBlur.pipeline);
             shaderSSAOBlur.SetVec2("winSize", { wnd.width, wnd.height });
-        glBindTextureUnit(0, texSSAO.textureName);
+            glBindTextureUnit(0, texSSAO.textureName);
 
-        glBindVertexArray(dummyVao);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
-        glBindVertexArray(0);
+            glBindVertexArray(dummyVao);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+            glBindVertexArray(0);
         }
 
         // Render to screen with post process
         {
             DebugGroupScope debugScope{ "post" };
 
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-        glClearNamedFramebufferfv(0, GL_COLOR, 0, clearColor);
-        glClearNamedFramebufferfv(0, GL_DEPTH, 0, &clearDepth);
+            glClearNamedFramebufferfv(0, GL_COLOR, 0, clearColor);
+            glClearNamedFramebufferfv(0, GL_DEPTH, 0, &clearDepth);
 
-        glViewport(0, 0, wnd.width, wnd.height);
+            glViewport(0, 0, wnd.width, wnd.height);
 
-        glBindProgramPipeline(shaderPost.pipeline);
+            glBindProgramPipeline(shaderPost.pipeline);
             shaderPost.SetInt("enableAo", (int)ssao.enableAo);
             shaderPost.SetInt("visualizeAo", (int)ssao.visualizeAo);
             shaderPost.SetInt("enableBloom", (int)bloom.enable);
             shaderPost.SetInt("visualizeBloom", (int)bloom.visualize);
-        glBindTextureUnit(0, texColor.textureName);
-        glBindTextureUnit(1, texSSAOBlur.textureName);
+            glBindTextureUnit(0, texColor.textureName);
+            glBindTextureUnit(1, texSSAOBlur.textureName);
             glBindTextureUnit(2, texBloom.textureName);
 
-        glBindVertexArray(dummyVao);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
-        glBindVertexArray(0);
+            glBindVertexArray(dummyVao);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+            glBindVertexArray(0);
         }
 
         // Render some text
         {
             DebugGroupScope debugScope{ "text" };
-        const auto ipsum = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.";
+            const auto ipsum = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.";
 
-        auto text1transform = glm::translate(glm::mat4{ 1.0f }, { 5.0f, 5.0f, 0.0f });
-        textRenderer.RenderString(fmt::format("Single line - {}", ipsum), text1transform);
+            auto text1transform = glm::translate(glm::mat4{ 1.0f }, { 5.0f, 5.0f, 0.0f });
+            textRenderer.RenderString(fmt::format("Single line - {}", ipsum), text1transform);
 
-        auto text2transform = glm::translate(glm::mat4{ 1.0f }, { 5.0f, 55.0f, 0.0f });
-        textRenderer.RenderString(fmt::format("Wrapped - {}", ipsum), text2transform, 500.0f);
+            auto text2transform = glm::translate(glm::mat4{ 1.0f }, { 5.0f, 55.0f, 0.0f });
+            textRenderer.RenderString(fmt::format("Wrapped - {}", ipsum), text2transform, 500.0f);
 
-        auto text3transform = glm::translate(glm::mat4{ 1.0f }, { wnd.width / 2.0f, wnd.height - 60.0f, 0.0f }) * glm::scale(glm::mat4{ 1.0f }, glm::vec3{ 0.6f });
-        textRendererMono.RenderString(fmt::format("Center - {}", ipsum), text3transform, 1500.0f, true);
+            auto text3transform = glm::translate(glm::mat4{ 1.0f }, { wnd.width / 2.0f, wnd.height - 60.0f, 0.0f }) * glm::scale(glm::mat4{ 1.0f }, glm::vec3{ 0.6f });
+            textRendererMono.RenderString(fmt::format("Center - {}", ipsum), text3transform, 1500.0f, true);
 
-        auto text4transform = glm::translate(glm::mat4{ 1.0f }, { 5.0f, 250.0f, 0.0f });
-        textRenderer.RenderString(fmt::format("Progress - {}", ipsum), text4transform, 700.0f, false, glm::sin(r / 2.0f));
+            auto text4transform = glm::translate(glm::mat4{ 1.0f }, { 5.0f, 250.0f, 0.0f });
+            textRenderer.RenderString(fmt::format("Progress - {}", ipsum), text4transform, 700.0f, false, glm::sin(r / 2.0f));
         }
 
         // ImGui
         {
             DebugGroupScope debugScope{ "ImGui" };
-        imgui.Render();
+            imgui.Render();
         }
 
         glfwSwapBuffers(wnd.window);
@@ -484,7 +563,7 @@ void DrawSceneUI(opengl_starter::Node* node)
         ImGui::DragFloat3("Pos", glm::value_ptr(node_clicked->pos), 0.1f, -1000.0f, 1000.0f);
         ImGui::DragFloat4("Rot", glm::value_ptr(node_clicked->rotq), 0.1f, -360.0f, 360.0f);
         ImGui::DragFloat3("Scl", glm::value_ptr(node_clicked->scale), 0.1f, 0.1f, 10.0f);
-    }    
+    }
 
     ImGui::End();
 }
