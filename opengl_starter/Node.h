@@ -49,7 +49,8 @@ namespace opengl_starter
             return nullptr;
         }
 
-        void RecurseNodes(std::function<void(Node*)> callback)
+        template <typename Callback>
+        void RecurseNodes(Callback callback)
         {
             callback(this);
             for (auto n : children)

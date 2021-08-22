@@ -1,4 +1,4 @@
-﻿#include "Common.h"
+#include "Common.h"
 
 #include "Camera.h"
 #include "Decal.h"
@@ -15,6 +15,26 @@
 #include "Texture.h"
 #include "Window.h"
 
+extern "C"
+{
+    __declspec(dllexport) unsigned long NvOptimusEnablement = 0x00000001;
+    __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
+}
+
+class DebugGroupScope
+{
+public:
+    DebugGroupScope(const std::string& name)
+    {
+        glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, (GLsizei)name.size(), name.c_str());
+    }
+
+    ~DebugGroupScope()
+    {
+        glPopDebugGroup();
+    }
+};
+
 void DrawSceneUI(opengl_starter::Node* node);
 
 void InitOpenGL()
@@ -22,21 +42,19 @@ void InitOpenGL()
     glEnable(GL_DEBUG_OUTPUT);
     glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
 
-    glDebugMessageCallback([](GLenum /*source*/, GLenum type, GLuint /*id*/, GLenum severity, GLsizei /*length*/, const GLchar* message, const void* /*userParam*/) {
+    glDebugMessageCallback([](GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei /*length*/, const GLchar* message, const void* /*userParam*/) {
+        if (source == GL_DEBUG_SOURCE_APPLICATION && id == 0)
+            return;
+
         auto level = type == GL_DEBUG_TYPE_ERROR ? spdlog::level::err : spdlog::level::warn;
         spdlog::log(level, "[opengl]: Severity = {}, Message = {}", severity, message);
     },
         nullptr);
 
     glEnable(GL_DEPTH_TEST);
-    glEnable(GL_MULTISAMPLE);
-
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW);
-
-    GLint MaxPatchVertices = 0;
-    glGetIntegerv(GL_MAX_PATCH_VERTICES, &MaxPatchVertices);
 }
 
 int main()
@@ -51,7 +69,6 @@ int main()
 
     std::vector<opengl_starter::Mesh*> meshes;
     std::vector<opengl_starter::Mesh*> meshesCube;
-
 
     auto files = Utils::File::GetFiles("assets/particles");
 
@@ -216,11 +233,15 @@ int main()
         textRenderer.Reset();
         textRendererMono.Reset();
 
-        // Render cube to texture
+        // Scene
+        {
+            DebugGroupScope debugScope{ "Scene" };
+
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.fbo);
 
         unsigned int attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
-        glDrawBuffers(2, attachments);
+
+            glNamedFramebufferDrawBuffers(framebuffer.fbo, 2, attachments);
 
         glClearNamedFramebufferfv(framebuffer.fbo, GL_COLOR, 0, clearColor);
         glClearNamedFramebufferfv(framebuffer.fbo, GL_COLOR, 1, clearColor2);
@@ -249,10 +270,18 @@ int main()
                 renderRef(c, renderRef);
         };
         render(&root, render);
+        }
 
+        // PS
+        {
+            DebugGroupScope debugScope{ "PS" };
         for (auto ps : particleSystems)
             ps->Render(projection, view);
+        }
 
+        // Decals
+        {
+            DebugGroupScope debugScope{ "Decals" };
         for (const auto& decal : decal.decals)
         {
             const glm::mat4 modelDecal = glm::translate(glm::mat4{ 1.0f }, decal.pos) *
@@ -283,12 +312,17 @@ int main()
             glDisable(GL_BLEND);
             glEnable(GL_CULL_FACE);
         }
+        }
 
         // ssao
+        if (ssao.enableAo)
+        {
+            DebugGroupScope debugScope{ "ssao" };
+
         glBindFramebuffer(GL_FRAMEBUFFER, framebufferSSAO.fbo);
 
         unsigned int attachments2[1] = { GL_COLOR_ATTACHMENT0 };
-        glDrawBuffers(1, attachments2);
+            glNamedFramebufferDrawBuffers(framebufferSSAO.fbo, 1, attachments2);
 
         glClearNamedFramebufferfv(framebufferSSAO.fbo, GL_COLOR, 0, clearColor2);
 
@@ -318,7 +352,7 @@ int main()
         // ssaoblur
         glBindFramebuffer(GL_FRAMEBUFFER, framebufferSSAOBlur.fbo);
 
-        glDrawBuffers(1, attachments2);
+            glNamedFramebufferDrawBuffers(framebufferSSAOBlur.fbo, 1, attachments2);
 
         glClearNamedFramebufferfv(framebufferSSAOBlur.fbo, GL_COLOR, 0, clearColor2);
 
@@ -332,8 +366,12 @@ int main()
         glBindVertexArray(dummyVao);
         glDrawArrays(GL_TRIANGLES, 0, 3);
         glBindVertexArray(0);
+        }
 
         // Render to screen with post process
+        {
+            DebugGroupScope debugScope{ "post" };
+
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
         glClearNamedFramebufferfv(0, GL_COLOR, 0, clearColor);
@@ -352,8 +390,11 @@ int main()
         glBindVertexArray(dummyVao);
         glDrawArrays(GL_TRIANGLES, 0, 3);
         glBindVertexArray(0);
+        }
 
         // Render some text
+        {
+            DebugGroupScope debugScope{ "text" };
         const auto ipsum = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.";
 
         auto text1transform = glm::translate(glm::mat4{ 1.0f }, { 5.0f, 5.0f, 0.0f });
@@ -367,8 +408,13 @@ int main()
 
         auto text4transform = glm::translate(glm::mat4{ 1.0f }, { 5.0f, 250.0f, 0.0f });
         textRenderer.RenderString(fmt::format("Progress - {}", ipsum), text4transform, 700.0f, false, glm::sin(r / 2.0f));
+        }
 
+        // ImGui
+        {
+            DebugGroupScope debugScope{ "ImGui" };
         imgui.Render();
+        }
 
         glfwSwapBuffers(wnd.window);
     }
