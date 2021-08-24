@@ -10,12 +10,14 @@ find_package(spdlog CONFIG REQUIRED)
 find_path(CGLTF_INCLUDE_DIRS "cgltf.h")
 
 add_executable (opengl_starter 
-    "opengl_starter.cpp" 
-    "TextRenderer.cpp"
-    "Terrain.cpp"
-    "ImGuiHandler.cpp" 
+    "DebugDraw.cpp"
     "GltfLoader.cpp"
-    "ParticleSystem.cpp")
+    "ImGuiHandler.cpp" 
+    "opengl_starter.cpp" 
+    "ParticleSystem.cpp"
+    "TextRenderer.cpp"
+    "Terrain.cpp"    
+)
 
 set_property(TARGET opengl_starter PROPERTY CXX_STANDARD 17)
 # target_compile_options(opengl_starter PRIVATE /W4 /WX)

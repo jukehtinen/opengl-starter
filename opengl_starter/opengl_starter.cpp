@@ -2,6 +2,7 @@
 
 #include "Bloom.h"
 #include "Camera.h"
+#include "DebugDraw.h"
 #include "Decal.h"
 #include "Font.h"
 #include "Framebuffer.h"
@@ -153,6 +154,8 @@ int main()
 
     opengl_starter::ImGuiHandler imgui{ wnd.window };
 
+    opengl_starter::DebugDraw debugDraw;
+
     opengl_starter::Decals decal;
 
     opengl_starter::SSAO ssao;
@@ -206,6 +209,7 @@ int main()
             glfwSetWindowShouldClose(wnd.window, true);
 
         imgui.NewFrame();
+        debugDraw.NewFrame();
 
         // Update
         const auto nowTime = std::chrono::high_resolution_clock::now();
@@ -251,6 +255,8 @@ int main()
 
         textRenderer.Reset();
         textRendererMono.Reset();
+
+        debugDraw.DrawCross({ 10.0f, 0.0f, 10.0f }, 2.0f);
 
         // Scene
         {
@@ -307,6 +313,8 @@ int main()
                                              glm::rotate(glm::mat4{ 1.0f }, glm::radians(decal.rot.x), { 1.0f, 0.0f, 0.0f }) *
                                              glm::scale(glm::mat4{ 1.0f }, decal.scale);
 
+                debugDraw.DrawBox({}, decal.scale.x, glm::vec4{ 1.0f, 1.0f, 1.0f, 1.0f }, modelDecal);
+
                 glDisable(GL_CULL_FACE);
                 glDepthMask(GL_FALSE);
                 glEnable(GL_BLEND);
@@ -332,6 +340,8 @@ int main()
                 glEnable(GL_CULL_FACE);
             }
         }
+
+        debugDraw.Render(camera.GetViewMatrix(), projection);
 
         // bloom
         if (bloom.enable)

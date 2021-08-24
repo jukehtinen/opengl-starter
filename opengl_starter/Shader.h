@@ -35,6 +35,11 @@ namespace opengl_starter
             glDeleteProgram(fragProg);
         }
 
+        void Bind()
+        {
+            glBindProgramPipeline(pipeline);
+        }
+
         void SetFloat(const std::string& uniform, float value)
         {
             glProgramUniform1f(fragProg, glGetUniformLocation(fragProg, uniform.c_str()), value);
