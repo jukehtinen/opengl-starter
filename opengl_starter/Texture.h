@@ -9,11 +9,20 @@ namespace opengl_starter
 {
     struct Texture
     {
+        enum class Wrap
+        {
+            ClampToBorder = GL_CLAMP_TO_BORDER,
+            ClampToEdge = GL_CLAMP_TO_EDGE,
+            ClampToEdgeMirrored = GL_MIRROR_CLAMP_TO_EDGE,
+            Repeat = GL_REPEAT,
+            RepeatMirrored = GL_MIRRORED_REPEAT
+        };
+
         Texture()
         {
         }
 
-        Texture(const std::string& filename)
+        Texture(const std::string& filename, Wrap wrapS = Wrap::Repeat, Wrap wrapT = Wrap::Repeat)
         {
             std::vector<unsigned char> image;
             unsigned int width, height;
@@ -27,8 +36,9 @@ namespace opengl_starter
 
             glCreateTextures(GL_TEXTURE_2D, 1, &textureName);
 
-            glTextureParameteri(textureName, GL_TEXTURE_WRAP_S, GL_REPEAT);
-            glTextureParameteri(textureName, GL_TEXTURE_WRAP_T, GL_REPEAT);
+            glTextureParameteri(textureName, GL_TEXTURE_WRAP_S, (GLint)wrapS);
+            glTextureParameteri(textureName, GL_TEXTURE_WRAP_T, (GLint)wrapT);
+
             glTextureParameteri(textureName, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
             glTextureParameteri(textureName, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
@@ -47,6 +57,7 @@ namespace opengl_starter
 
             glTextureParameteri(textureName, GL_TEXTURE_WRAP_S, GL_REPEAT);
             glTextureParameteri(textureName, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
             glTextureParameteri(textureName, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
             glTextureParameteri(textureName, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 

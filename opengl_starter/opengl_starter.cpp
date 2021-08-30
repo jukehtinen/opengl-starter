@@ -1,4 +1,4 @@
-﻿#include "Common.h"
+#include "Common.h"
 
 #include "Bloom.h"
 #include "Camera.h"
@@ -36,6 +36,8 @@ public:
         glPopDebugGroup();
     }
 };
+
+float health = 1.0f;
 
 void DrawSceneUI(opengl_starter::Node* node);
 
@@ -90,6 +92,8 @@ int main()
     opengl_starter::Texture texBrown("assets/brown.png");
     opengl_starter::Texture texFont{ "assets/robotoregular.png" };
     opengl_starter::Texture texFontMono{ "assets/robotomono.png" };
+    opengl_starter::Texture texHealthbar{ "assets/healthbar-gradient.png", opengl_starter::Texture::Wrap::ClampToEdge, opengl_starter::Texture::Wrap::ClampToEdge };
+    opengl_starter::Texture texHealthbarMask{ "assets/healthbar-mask.png" };
     opengl_starter::Texture texParticle1{ "assets/particles/flame_01.png" };
     opengl_starter::Texture texParticle2{ "assets/particles/spark_01.png" };
     auto texNoise = opengl_starter::Texture::CreateNoiseTexture(4, 4);
@@ -97,6 +101,8 @@ int main()
     opengl_starter::Shader shaderDecal("assets/decal.vert", "assets/decal.frag");
     opengl_starter::Shader shaderTerrain("assets/terrain.vert", "assets/terrain.frag");
     opengl_starter::Shader shaderTerrainTess("assets/terrain_tess.vert", "assets/terrain_tess.frag", "assets/terrain_tess.tesc", "assets/terrain_tess.tese");
+    opengl_starter::Shader shaderBillboardImage("assets/billboard-image.vert", "assets/billboard-image.frag");
+    opengl_starter::Shader shaderBillboardHealth("assets/billboard-healthbar.vert", "assets/billboard-healthbar.frag");
     opengl_starter::Shader shaderSSAO("assets/ssao.vert", "assets/ssao.frag");
     opengl_starter::Shader shaderSSAOBlur("assets/blur.vert", "assets/blur.frag");
     opengl_starter::Shader shaderBloomExtract("assets/bloom-extract-brights.vert", "assets/bloom-extract-brights.frag");
@@ -200,6 +206,7 @@ int main()
     glCreateVertexArrays(1, &dummyVao);
 
     auto prevTime = std::chrono::high_resolution_clock::now();
+    float totalTime = 0.0f;
 
     while (!glfwWindowShouldClose(wnd.window))
     {
@@ -216,8 +223,7 @@ int main()
         const auto delta = static_cast<float>(std::chrono::duration_cast<std::chrono::duration<double>>(nowTime - prevTime).count());
         prevTime = nowTime;
 
-        static float r = 0.0f;
-        r += delta * 1.0f;
+        totalTime += delta;
 
         camera.Update(delta);
         for (auto ps : particleSystems)
@@ -225,12 +231,8 @@ int main()
 
         imgui.Update(delta);
 
-        const glm::vec3 eye{ 7.5f, 3.0f, 0.0f };
         const glm::mat4 projection = glm::perspective(glm::radians(camera.Fov), static_cast<float>(frameWidth) / static_cast<float>(frameHeight), 0.1f, 100.0f);
         const glm::mat4 view = camera.GetViewMatrix();
-
-        const glm::mat4 model = glm::rotate(glm::mat4{ 1.0f }, glm::sin(r) * glm::pi<float>(), { 0.0f, 1.0f, 0.0f }) *
-                                glm::rotate(glm::mat4{ 1.0f }, glm::sin(-r) * glm::pi<float>(), { 1.0f, 0.0f, 0.0f });
 
         auto transform = [](opengl_starter::Node* n, const glm::mat4& parentTransform, auto& transformRef) -> void {
             n->model = parentTransform * glm::translate(glm::mat4{ 1.0f }, n->pos) *
@@ -339,6 +341,42 @@ int main()
                 glDisable(GL_BLEND);
                 glEnable(GL_CULL_FACE);
             }
+        }
+
+        {
+            DebugGroupScope debugScope{ "billboard test" };
+            shaderBillboardImage.Bind();
+            shaderBillboardImage.SetMat4("model", glm::translate(glm::mat4{ 1.0f }, { 9.0f, 2.4f, -17.2f }));
+            shaderBillboardImage.SetMat4("view", view);
+            shaderBillboardImage.SetMat4("projection", projection);
+            shaderBillboardImage.SetFloat("time", totalTime);
+            glEnable(GL_BLEND);
+            glDepthMask(GL_FALSE);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            glBindTextureUnit(0, texParticle1.textureName);
+            glBindVertexArray(dummyVao);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+            glBindVertexArray(0);
+            glDisable(GL_BLEND);
+            glDepthMask(GL_TRUE);
+
+            shaderBillboardHealth.Bind();
+            shaderBillboardHealth.SetMat4("model", glm::translate(glm::mat4{ 1.0f }, { 9.0f, 4.4f, -17.2f }));
+            shaderBillboardHealth.SetMat4("view", view);
+            shaderBillboardHealth.SetMat4("projection", projection);
+            shaderBillboardHealth.SetFloat("time", totalTime);
+            shaderBillboardHealth.SetFloat("health", health);
+            shaderBillboardHealth.SetFloat("distanceToCamera", glm::distance({ 9.0f, 4.4f, -17.2f }, camera.Position));
+            glEnable(GL_BLEND);
+            glDepthMask(GL_FALSE);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            glBindTextureUnit(0, texHealthbar.textureName);
+            glBindTextureUnit(1, texHealthbarMask.textureName);
+            glBindVertexArray(dummyVao);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+            glBindVertexArray(0);
+            glDisable(GL_BLEND);
+            glDepthMask(GL_TRUE);
         }
 
         debugDraw.Render(camera.GetViewMatrix(), projection);
@@ -495,7 +533,7 @@ int main()
             textRendererMono.RenderString(fmt::format("Center - {}", ipsum), text3transform, 1500.0f, true);
 
             auto text4transform = glm::translate(glm::mat4{ 1.0f }, { 5.0f, 250.0f, 0.0f });
-            textRenderer.RenderString(fmt::format("Progress - {}", ipsum), text4transform, 700.0f, false, glm::sin(r / 2.0f));
+            textRenderer.RenderString(fmt::format("Progress - {}", ipsum), text4transform, 700.0f, false, glm::sin(totalTime / 2.0f));
         }
 
         // ImGui
@@ -575,5 +613,9 @@ void DrawSceneUI(opengl_starter::Node* node)
         ImGui::DragFloat3("Scl", glm::value_ptr(node_clicked->scale), 0.1f, 0.1f, 10.0f);
     }
 
+    ImGui::End();
+
+    ImGui::Begin("Hax");
+    ImGui::DragFloat("Health", &health, 0.01f, 0.0f, 1.0f);
     ImGui::End();
 }
