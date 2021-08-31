@@ -10,13 +10,13 @@ namespace Utils
 {
     namespace File
     {
-        static std::string LoadString(const std::string& filename)
+        static std::string LoadText(const std::string& filename)
         {
             std::ifstream stream(filename);
             if (!stream.is_open())
             {
                 DEBUGGER;
-                spdlog::error("[LoadString] Failed to load file {}", filename);
+                spdlog::error("[LoadText] Failed to load file {}", filename);
                 return "";
             }
 

@@ -11,16 +11,16 @@ namespace opengl_starter
             glGenProgramPipelines(1, &pipeline);
             glBindProgramPipeline(pipeline);
 
-            vertProg = CreateProgram(GL_VERTEX_SHADER, Utils::File::LoadString(vertFile));
-            fragProg = CreateProgram(GL_FRAGMENT_SHADER, Utils::File::LoadString(fragFile));
+            vertProg = CreateProgram(GL_VERTEX_SHADER, Utils::File::LoadText(vertFile));
+            fragProg = CreateProgram(GL_FRAGMENT_SHADER, Utils::File::LoadText(fragFile));
 
             glUseProgramStages(pipeline, GL_VERTEX_SHADER_BIT, vertProg);
             glUseProgramStages(pipeline, GL_FRAGMENT_SHADER_BIT, fragProg);
 
             if (!tesc.empty())
             {
-                tescProg = CreateProgram(GL_TESS_CONTROL_SHADER, Utils::File::LoadString(tesc));
-                teseProg = CreateProgram(GL_TESS_EVALUATION_SHADER, Utils::File::LoadString(tese));
+                tescProg = CreateProgram(GL_TESS_CONTROL_SHADER, Utils::File::LoadText(tesc));
+                teseProg = CreateProgram(GL_TESS_EVALUATION_SHADER, Utils::File::LoadText(tese));
                 glUseProgramStages(pipeline, GL_TESS_CONTROL_SHADER_BIT, tescProg);
                 glUseProgramStages(pipeline, GL_TESS_EVALUATION_SHADER_BIT, teseProg);
             }
@@ -60,6 +60,11 @@ namespace opengl_starter
             glProgramUniform2fv(fragProg, glGetUniformLocation(fragProg, uniform.c_str()), 1, glm::value_ptr(value));
         }
 
+        void SetVec3(const std::string& uniform, const glm::vec3& value)
+        {
+            glProgramUniform3fv(fragProg, glGetUniformLocation(fragProg, uniform.c_str()), 1, glm::value_ptr(value));
+        }
+
         void SetVec4(const std::string& uniform, const glm::vec4& value)
         {
             glProgramUniform4fv(fragProg, glGetUniformLocation(fragProg, uniform.c_str()), 1, glm::value_ptr(value));
@@ -83,8 +88,6 @@ namespace opengl_starter
 
                 DEBUGGER;
             }
-
-            // PrintUniforms(prog);
 
             return prog;
         }

@@ -38,6 +38,7 @@ public:
 };
 
 float health = 1.0f;
+glm::vec3 lightAnglesDeg = { 0.0f, 310.0f, 140.0f };
 
 void DrawSceneUI(opengl_starter::Node* node);
 
@@ -260,6 +261,15 @@ int main()
 
         debugDraw.DrawCross({ 10.0f, 0.0f, 10.0f }, 2.0f);
 
+        glm::mat4 lightDebugMat = glm::translate(glm::mat4{ 1.0f }, { -5.0f, 5.0f, -5.0f }) *
+                                  glm::rotate(glm::mat4{ 1.0f }, glm::radians(lightAnglesDeg.y), { 0.0f, 1.0f, 0.0f }) *
+                                  glm::rotate(glm::mat4{ 1.0f }, glm::radians(lightAnglesDeg.z), { 0.0f, 0.0f, 1.0f }) *
+                                  glm::rotate(glm::mat4{ 1.0f }, glm::radians(lightAnglesDeg.x), { 1.0f, 0.0f, 0.0f });
+
+        glm::vec3 lightDir = lightDebugMat * glm::vec4{ 0.0f, 1.0f, 0.0f, 0.0f };
+
+        debugDraw.DrawArrow({}, 1.0f, { 1.0f, 1.0f, 1.0f, 1.0f }, lightDebugMat);
+
         // Scene
         {
             DebugGroupScope debugScope{ "Scene" };
@@ -281,11 +291,12 @@ int main()
             glBindProgramPipeline(shaderCube.pipeline);
             shaderCube.SetMat4("vp", projection * view);
 
-            auto render = [&shaderCube, &texPalette, &view](opengl_starter::Node* node, auto& renderRef) -> void {
+            auto render = [&shaderCube, &texPalette, &view, &lightDir](opengl_starter::Node* node, auto& renderRef) -> void {
                 if (node->mesh != nullptr)
                 {
                     shaderCube.SetMat4("model", node->model);
                     shaderCube.SetMat4("view", view);
+                    shaderCube.SetVec3("lightDir", -lightDir);
                     glBindTextureUnit(0, texPalette.textureName);
                     glBindVertexArray(node->mesh->vao);
                     glDrawElements(GL_TRIANGLES, node->mesh->indexCount, GL_UNSIGNED_INT, nullptr);
@@ -617,5 +628,7 @@ void DrawSceneUI(opengl_starter::Node* node)
 
     ImGui::Begin("Hax");
     ImGui::DragFloat("Health", &health, 0.01f, 0.0f, 1.0f);
+    ImGui::DragFloat3("Light", glm::value_ptr(lightAnglesDeg), 1.0f, 0.0f, 360.0f);
+
     ImGui::End();
 }

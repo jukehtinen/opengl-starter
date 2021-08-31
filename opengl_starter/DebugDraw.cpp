@@ -102,4 +102,11 @@ namespace opengl_starter
         DrawLine({ center.x, center.y - half, center.z }, { center.x, center.y + half, center.z }, color, model);
         DrawLine({ center.x, center.y, center.z - half }, { center.x, center.y, center.z + half }, color, model);
     }
+
+    void DebugDraw::DrawArrow(const glm::vec3& start, const float length, const glm::vec4& color, const glm::mat4& model)
+    {
+        const glm::vec3 end = start + (glm::vec3{ 0.0f, 1.0f, 0.0f } * length);
+        DrawLine(start, end, color, model);
+        DrawCross(end, 0.3f, color, model);
+    }
 }

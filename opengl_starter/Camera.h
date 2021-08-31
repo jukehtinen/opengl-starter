@@ -6,11 +6,11 @@ namespace opengl_starter
 {
     struct Camera
     {
-        const float MaxSpeed = 5.0f;
+        const float MaxSpeed = 15.0f;
         const float Sensitivity = 0.1f;
         const float FOV = 45.0f;
 
-        Camera(GLFWwindow* window, glm::vec3 position = glm::vec3(5.0f, 3.5f, 5.0f))
+        Camera(GLFWwindow* window, glm::vec3 position = glm::vec3(15.0f, 12.0f, 10.0f))
             : window(window), Position(position)
         {
             UpdateVectors();
@@ -98,8 +98,8 @@ namespace opengl_starter
         glm::vec3 Right;
         glm::vec3 WorldUp = glm::vec3{ 0.0f, 1.0f, 0.0f };
 
-        float Yaw = -90.0f;
-        float Pitch = 0.0f;
+        float Yaw = -130.0f;
+        float Pitch = -30.0f;
 
         float MovementSpeed = MaxSpeed;
         float MouseSensitivity = Sensitivity;
