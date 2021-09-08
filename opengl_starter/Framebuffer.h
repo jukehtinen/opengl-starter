@@ -15,6 +15,11 @@ namespace opengl_starter
                 glNamedFramebufferTexture(fbo, type, texture, 0);
             }
 
+            if (attachments.size() == 1 && attachments[0].first == GL_DEPTH_ATTACHMENT)
+            {
+                glNamedFramebufferDrawBuffer(fbo, GL_NONE);
+            }
+
             if (glCheckNamedFramebufferStatus(fbo, GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
             {
                 spdlog::error("[Fbo] Not complete");

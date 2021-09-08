@@ -9,6 +9,12 @@ namespace opengl_starter
 {
     struct Texture
     {
+        enum class Filter
+        {
+            Nearest = GL_NEAREST,
+            Linear = GL_LINEAR
+        };
+
         enum class Wrap
         {
             ClampToBorder = GL_CLAMP_TO_BORDER,
@@ -68,14 +74,18 @@ namespace opengl_starter
             glGenerateTextureMipmap(textureName);
         }
 
-        Texture(int width, int height, GLenum format)
+        Texture(int width, int height, GLenum format, Wrap wrapS = Wrap::ClampToEdge, Wrap wrapT = Wrap::ClampToEdge, Filter filter = Filter::Linear)
         {
             glCreateTextures(GL_TEXTURE_2D, 1, &textureName);
 
-            glTextureParameteri(textureName, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-            glTextureParameteri(textureName, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-            glTextureParameteri(textureName, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTextureParameteri(textureName, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTextureParameteri(textureName, GL_TEXTURE_WRAP_S, (GLint)wrapS);
+            glTextureParameteri(textureName, GL_TEXTURE_WRAP_T, (GLint)wrapT);
+            glTextureParameteri(textureName, GL_TEXTURE_MIN_FILTER, (GLint)filter);
+            glTextureParameteri(textureName, GL_TEXTURE_MAG_FILTER, (GLint)filter);
+
+            // shadow map only
+            float borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
+            glTextureParameterfv(textureName, GL_TEXTURE_BORDER_COLOR, borderColor);
 
             glTextureStorage2D(textureName, 1, format, width, height);
         }

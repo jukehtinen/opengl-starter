@@ -38,7 +38,7 @@ public:
 };
 
 float health = 1.0f;
-glm::vec3 lightAnglesDeg = { 0.0f, 310.0f, 140.0f };
+glm::vec3 lightAnglesDeg = { 340.0f, 317.0f, 127.0f };
 
 void DrawSceneUI(opengl_starter::Node* node);
 
@@ -99,6 +99,7 @@ int main()
     opengl_starter::Texture texParticle2{ "assets/particles/spark_01.png" };
     auto texNoise = opengl_starter::Texture::CreateNoiseTexture(4, 4);
     opengl_starter::Shader shaderCube("assets/cube.vert", "assets/cube.frag");
+    opengl_starter::Shader shaderCubeDepth("assets/cube.vert", "assets/cubeDepth.frag");
     opengl_starter::Shader shaderDecal("assets/decal.vert", "assets/decal.frag");
     opengl_starter::Shader shaderTerrain("assets/terrain.vert", "assets/terrain.frag");
     opengl_starter::Shader shaderTerrainTess("assets/terrain_tess.vert", "assets/terrain_tess.frag", "assets/terrain_tess.tesc", "assets/terrain_tess.tese");
@@ -121,6 +122,10 @@ int main()
     opengl_starter::Texture texSSAOBlur{ frameWidth, frameHeight, GL_RGBA32F };
     opengl_starter::Texture texBloom{ frameWidth / 4, frameHeight / 4, GL_RGBA8 };
     opengl_starter::Texture texBloomBlur{ frameWidth / 4, frameHeight / 4, GL_RGBA8 };
+
+    const int ShadowMapSize = 1024;
+    opengl_starter::Texture texShadowMap{ ShadowMapSize, ShadowMapSize, GL_DEPTH32F_STENCIL8,
+        opengl_starter::Texture::Wrap::ClampToBorder, opengl_starter::Texture::Wrap::ClampToBorder, opengl_starter::Texture::Filter::Nearest };
 
     opengl_starter::Framebuffer framebuffer{
         { { GL_COLOR_ATTACHMENT0, texColor.textureName },
@@ -149,6 +154,12 @@ int main()
     opengl_starter::Framebuffer framebufferBloomBlur{
         {
             { GL_COLOR_ATTACHMENT0, texBloomBlur.textureName },
+        }
+    };
+
+    opengl_starter::Framebuffer framebufferShadowMap{
+        {
+            { GL_DEPTH_ATTACHMENT, texShadowMap.textureName },
         }
     };
 
@@ -259,9 +270,10 @@ int main()
         textRenderer.Reset();
         textRendererMono.Reset();
 
+        const glm::vec3 lightPos{ 15.0f, 15.0f, 15.0f };
         debugDraw.DrawCross({ 10.0f, 0.0f, 10.0f }, 2.0f);
 
-        glm::mat4 lightDebugMat = glm::translate(glm::mat4{ 1.0f }, { -5.0f, 5.0f, -5.0f }) *
+        glm::mat4 lightDebugMat = glm::translate(glm::mat4{ 1.0f }, lightPos) *
                                   glm::rotate(glm::mat4{ 1.0f }, glm::radians(lightAnglesDeg.y), { 0.0f, 1.0f, 0.0f }) *
                                   glm::rotate(glm::mat4{ 1.0f }, glm::radians(lightAnglesDeg.z), { 0.0f, 0.0f, 1.0f }) *
                                   glm::rotate(glm::mat4{ 1.0f }, glm::radians(lightAnglesDeg.x), { 1.0f, 0.0f, 0.0f });
@@ -269,6 +281,41 @@ int main()
         glm::vec3 lightDir = lightDebugMat * glm::vec4{ 0.0f, 1.0f, 0.0f, 0.0f };
 
         debugDraw.DrawArrow({}, 1.0f, { 1.0f, 1.0f, 1.0f, 1.0f }, lightDebugMat);
+
+        // Shadowmap
+        glm::mat4 lightSpaceMatrix;
+        {
+            glm::mat4 lightProjection, lightView;
+            float near_plane = 1.0f, far_plane = 70.5f;
+            lightProjection = glm::ortho(-20.0f, 20.0f, -20.0f, 20.0f, near_plane, far_plane);
+            lightView = glm::lookAt(lightPos, lightPos + lightDir, glm::vec3(0.0, 1.0, 0.0));
+            lightSpaceMatrix = lightProjection * lightView;
+
+            DebugGroupScope debugScope{ "Shadowmap" };
+
+            glBindFramebuffer(GL_FRAMEBUFFER, framebufferShadowMap.fbo);
+
+            glClearNamedFramebufferfv(framebufferShadowMap.fbo, GL_DEPTH, 0, &clearDepth);
+
+            glViewport(0, 0, ShadowMapSize, ShadowMapSize);
+
+            glBindProgramPipeline(shaderCubeDepth.pipeline);
+            shaderCubeDepth.SetMat4("vp", lightSpaceMatrix);
+
+            auto render = [&shaderCubeDepth, &lightView](opengl_starter::Node* node, auto& renderRef) -> void {
+                if (node->mesh != nullptr)
+                {
+                    shaderCubeDepth.SetMat4("model", node->model);
+                    shaderCubeDepth.SetMat4("view", lightView);
+                    glBindVertexArray(node->mesh->vao);
+                    glDrawElements(GL_TRIANGLES, node->mesh->indexCount, GL_UNSIGNED_INT, nullptr);
+                    glBindVertexArray(0);
+                }
+                for (auto c : node->children)
+                    renderRef(c, renderRef);
+            };
+            render(&root, render);
+        }
 
         // Scene
         {
@@ -291,13 +338,15 @@ int main()
             glBindProgramPipeline(shaderCube.pipeline);
             shaderCube.SetMat4("vp", projection * view);
 
-            auto render = [&shaderCube, &texPalette, &view, &lightDir](opengl_starter::Node* node, auto& renderRef) -> void {
+            auto render = [&shaderCube, &texPalette, &texShadowMap, &view, &lightDir, &lightSpaceMatrix](opengl_starter::Node* node, auto& renderRef) -> void {
                 if (node->mesh != nullptr)
                 {
                     shaderCube.SetMat4("model", node->model);
                     shaderCube.SetMat4("view", view);
                     shaderCube.SetVec3("lightDir", -lightDir);
+                    shaderCube.SetMat4("lightSpaceMatrix", lightSpaceMatrix);
                     glBindTextureUnit(0, texPalette.textureName);
+                    glBindTextureUnit(1, texShadowMap.textureName);
                     glBindVertexArray(node->mesh->vao);
                     glDrawElements(GL_TRIANGLES, node->mesh->indexCount, GL_UNSIGNED_INT, nullptr);
                     glBindVertexArray(0);
