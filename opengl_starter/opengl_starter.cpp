@@ -38,6 +38,8 @@ public:
 };
 
 float health = 1.0f;
+float animationPos = 0.0f;
+bool animationManual = false;
 glm::vec3 lightAnglesDeg = { 340.0f, 317.0f, 127.0f };
 
 void DrawSceneUI(opengl_starter::Node* node);
@@ -83,6 +85,11 @@ int main()
     opengl_starter::GltfLoader::Load("assets/atelier.glb", &root, meshes);
     opengl_starter::GltfLoader::Load("assets/cube.glb", nullptr, meshes);
     opengl_starter::GltfLoader::Load("assets/unit_cube.glb", nullptr, meshesCube);
+    
+    auto animClockRoot = opengl_starter::GltfLoader::Load("assets/anim_test_clock.glb", &root, meshes);
+    auto animBallRoot = opengl_starter::GltfLoader::Load("assets/anim_test_ball.glb", &root, meshes);
+    animClockRoot->pos = glm::vec3{ 11.0f, 0.0f, -2.5f };
+    animBallRoot->pos = glm::vec3{ 8.0f, 0.0f, -4.5f };
 
     opengl_starter::Mesh* meshUnitCube = meshesCube[0];
 
@@ -220,6 +227,8 @@ int main()
     auto prevTime = std::chrono::high_resolution_clock::now();
     float totalTime = 0.0f;
 
+    float t = 0.0f;
+
     while (!glfwWindowShouldClose(wnd.window))
     {
         glfwPollEvents();
@@ -246,15 +255,34 @@ int main()
         const glm::mat4 projection = glm::perspective(glm::radians(camera.Fov), static_cast<float>(frameWidth) / static_cast<float>(frameHeight), 0.1f, 100.0f);
         const glm::mat4 view = camera.GetViewMatrix();
 
-        auto transform = [](opengl_starter::Node* n, const glm::mat4& parentTransform, auto& transformRef) -> void {
-            n->model = parentTransform * glm::translate(glm::mat4{ 1.0f }, n->pos) *
-                       glm::mat4_cast(n->rotq) *
-                       glm::scale(glm::mat4{ 1.0f }, n->scale);
+        if (animationManual)
+            t = animationPos;
+        else 
+            t += delta;
+
+        auto transform = [](opengl_starter::Node* n, const glm::mat4& parentTransform, auto& transformRef, auto& t) -> void {
+            if (n->animations.size() > 0)
+            {
+                for (auto& anim : n->animations)
+                    anim.Animate(t, n);
+
+                glm::mat4 local = glm::translate(glm::mat4{ 1.0f }, n->pos) *
+                                  glm::mat4_cast(n->rotq) *
+                                  glm::scale(glm::mat4{ 1.0f }, n->scale);
+
+                n->model = parentTransform * local;
+            }
+            else
+            {
+                n->model = parentTransform * glm::translate(glm::mat4{ 1.0f }, n->pos) *
+                           glm::mat4_cast(n->rotq) *
+                           glm::scale(glm::mat4{ 1.0f }, n->scale);
+            }
 
             for (auto c : n->children)
-                transformRef(c, n->model, transformRef);
+                transformRef(c, n->model, transformRef, t);
         };
-        transform(&root, glm::mat4{ 1.0f }, transform);
+        transform(&root, glm::mat4{ 1.0f }, transform, t);
 
         decal.OnDecalUI();
         ssao.OnUI();
@@ -678,6 +706,7 @@ void DrawSceneUI(opengl_starter::Node* node)
     ImGui::Begin("Hax");
     ImGui::DragFloat("Health", &health, 0.01f, 0.0f, 1.0f);
     ImGui::DragFloat3("Light", glm::value_ptr(lightAnglesDeg), 1.0f, 0.0f, 360.0f);
-
+    ImGui::Checkbox("AnimManual", &animationManual);
+    ImGui::DragFloat("animationPos", &animationPos, 0.01f, 0.0f, 100.0f);    
     ImGui::End();
 }

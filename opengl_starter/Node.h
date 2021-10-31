@@ -2,6 +2,8 @@
 
 #include <functional>
 
+#include "Animation.h"
+
 namespace opengl_starter
 {
     struct Mesh;
@@ -33,6 +35,8 @@ namespace opengl_starter
 
         Mesh* mesh = nullptr;
         RenderPassFlags renderPassFlags = RenderPassFlags::Mesh;
+
+        std::vector<Animation> animations;
 
         Node* FindNode(const std::string& search)
         {

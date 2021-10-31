@@ -10,7 +10,7 @@
       "cmakeCommandArgs": "",
       "buildCommandArgs": "",
       "ctestCommandArgs": "",
-      "addressSanitizerEnabled": true,
+      "addressSanitizerEnabled": false,
       "enableClangTidyCodeAnalysis": true
     },
     {

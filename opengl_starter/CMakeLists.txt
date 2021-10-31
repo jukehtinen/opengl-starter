@@ -10,6 +10,7 @@ find_package(spdlog CONFIG REQUIRED)
 find_path(CGLTF_INCLUDE_DIRS "cgltf.h")
 
 add_executable (opengl_starter 
+    "Animation.cpp"
     "DebugDraw.cpp"
     "GltfLoader.cpp"
     "ImGuiHandler.cpp" 

@@ -1,4 +1,5 @@
 #include "GltfLoader.h"
+#include "Animation.h"
 
 #pragma warning(push)
 #pragma warning(disable : 4996) // warning C4996: '...': This function or variable may be unsafe.
@@ -15,18 +16,101 @@ namespace opengl_starter
         float normal[3];
     };
 
-    void GltfLoader::Load(const std::string& filename, opengl_starter::Node* parentNode, std::vector<opengl_starter::Mesh*>& outMeshes)
+    void LoadAnimations(cgltf_data* data, cgltf_node* n, opengl_starter::Node* node)
+    {
+        for (int a = 0; a < data->animations_count; a++)
+        {
+            const auto& animation = data->animations[a];
+
+            for (int c = 0; c < animation.channels_count; c++)
+            {
+                const auto& channel = animation.channels[c];
+
+                if (channel.target_node != n)
+                    continue;
+
+                spdlog::info("Animation {}", animation.name);
+
+                const auto& sampler = channel.sampler;
+
+                Track animTrack;
+
+                std::string pathString;
+                switch (channel.target_path)
+                {
+                case cgltf_animation_path_type_translation:
+                    animTrack.target = Target::Translation;
+                    pathString = "cgltf_animation_path_type_translation";
+                    break;
+                case cgltf_animation_path_type_rotation:
+                    animTrack.target = Target::Rotation;
+                    pathString = "cgltf_animation_path_type_rotation";
+                    break;
+                case cgltf_animation_path_type_scale:
+                    animTrack.target = Target::Scale;
+                    pathString = "cgltf_animation_path_type_scale";
+                    break;
+                default:
+                    spdlog::warn("[GltfLoader] Unknown target_path {0}", channel.target_path);
+                    break;
+                }
+
+                std::string interpolationString;
+                switch (sampler->interpolation)
+                {
+                case cgltf_interpolation_type_linear:
+                    animTrack.interpolation = Interpolation::Linear;
+                    interpolationString = "cgltf_interpolation_type_linear";
+                    break;
+                case cgltf_interpolation_type_step:
+                    animTrack.interpolation = Interpolation::Step;
+                    interpolationString = "cgltf_interpolation_type_step";
+                    break;
+                case cgltf_interpolation_type_cubic_spline:
+                    animTrack.interpolation = Interpolation::Cubic;
+                    interpolationString = "cgltf_interpolation_type_cubic_spline";
+                    break;
+                default:
+                    spdlog::warn("[GltfLoader] Unknown interpolation {0}", channel.target_path);
+                    break;
+                }
+
+                auto inputFloats = cgltf_accessor_unpack_floats(sampler->input, nullptr, 0);
+                auto outputFloats = cgltf_accessor_unpack_floats(sampler->output, nullptr, 0);
+
+                animTrack.times.resize(inputFloats);
+                animTrack.values.resize(outputFloats);
+
+                cgltf_accessor_unpack_floats(sampler->input, animTrack.times.data(), inputFloats);
+                cgltf_accessor_unpack_floats(sampler->output, animTrack.values.data(), outputFloats);
+
+                spdlog::info("[GltfLoader] Channel target: {} path: {} ip: {} first_ts:{} last_ts:{} Inputs:{} Outputs:{}", channel.target_node->name, pathString, interpolationString, animTrack.times.front(), animTrack.times.back(), sampler->input->count, sampler->output->count);
+
+                Animation animation;
+                animation.tracks.push_back(std::move(animTrack));
+
+                node->animations.push_back(std::move(animation));
+            }
+        }
+    }
+
+    opengl_starter::Node* GltfLoader::Load(const std::string& filename, opengl_starter::Node* parentNode, std::vector<opengl_starter::Mesh*>& outMeshes)
     {
         cgltf_options options = {};
         cgltf_data* data = nullptr;
         cgltf_result result = cgltf_parse_file(&options, filename.c_str(), &data);
         if (result != cgltf_result_success)
         {
-            spdlog::error("[cgltf] Failed to load file {}", filename);
-            return;
+            spdlog::error("[cgltf] cgltf_parse_file failed to load file {} ({})", filename, result);
+            return nullptr;
         }
 
         result = cgltf_load_buffers(&options, data, nullptr);
+        if (result != cgltf_result_success)
+        {
+            spdlog::error("[cgltf] cgltf_load_buffers failed to load file {} ({})", filename, result);
+            return nullptr;
+        }        
 
         // Have another vector to avoid name collisions.
         std::vector<opengl_starter::Mesh*> meshes;
@@ -111,13 +195,16 @@ namespace opengl_starter
 
         std::copy(meshes.begin(), meshes.end(), std::back_inserter(outMeshes));
 
+        opengl_starter::Node* sceneRoot = nullptr;
         if (parentNode != nullptr)
         {
-            auto createNode = [&meshes](opengl_starter::Node* parent, cgltf_node* n, auto& createNodeRef) -> void {
+            auto createNode = [&meshes](cgltf_data* data, opengl_starter::Node* parent, cgltf_node* n, auto& createNodeRef) -> void {
                 auto node = new opengl_starter::Node{ fmt::format("{}", n->name) };
                 node->pos = glm::make_vec3(n->translation);
                 node->scale = glm::make_vec3(n->scale);
                 node->rotq = glm::make_quat(n->rotation);
+
+                LoadAnimations(data, n, node);
 
                 if (n->mesh != nullptr)
                 {
@@ -129,21 +216,23 @@ namespace opengl_starter
 
                 for (int m = 0; m < n->children_count; m++)
                 {
-                    createNodeRef(node, n->children[m], createNodeRef);
+                    createNodeRef(data, node, n->children[m], createNodeRef);
                 }
             };
 
-            auto sceneRoot = new opengl_starter::Node{ fmt::format("{}", data->scenes[0].name) };
+            sceneRoot = new opengl_starter::Node{ fmt::format("{}", data->scenes[0].name) };
 
             for (int m = 0; m < data->scenes[0].nodes_count; m++)
             {
                 const auto n = data->scenes[0].nodes[m];
-                createNode(sceneRoot, n, createNode);
+                createNode(data, sceneRoot, n, createNode);
             }
 
             parentNode->children.push_back(sceneRoot);
         }
 
         cgltf_free(data);
+
+        return sceneRoot;
     }
 }
