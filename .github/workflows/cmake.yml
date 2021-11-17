@@ -15,21 +15,15 @@ jobs:
     - uses: lukka/get-cmake@latest
 
     - name: Restore artifacts, or setup vcpkg (do not install any package)
-      uses: lukka/run-vcpkg@v6
-      with:      
-        setupOnly: true
-        appendedCacheKey: ${{ hashFiles( '**/vcpkg.json' ) }}
-        vcpkgTriplet: "x64-windows"
-        additionalCachedPaths: ${{ env.buildDir }}/vcpkg_installed
-        vcpkgGitCommitId: "3166bcc15b156b57667d9e573fba9775ceef3eb1"
+      uses: lukka/run-vcpkg@v10
+      with:
+        vcpkgGitCommitId: "1a5075baf8e5a1a10fab6282c18587741dcc155e"
 
     - name: Run CMake to install the dependencies specified in the vcpkg.json manifest, generate project file and build the project
-      uses: lukka/run-cmake@v3
+      uses: lukka/run-cmake@v10
       with:
-        useVcpkgToolchainFile: true
-        buildDirectory: ${{ runner.workspace }}/build
-        cmakeBuildType: "Release"
-        cmakeAppendedArgs: '-GNinja'
+         configurePreset: 'windows-release'
+         buildPreset: 'ninja-multi-vcpkg'
     
     - name: Upload artifact
       uses: actions/upload-artifact@v2
