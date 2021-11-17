@@ -2,24 +2,11 @@
 
 OpenGL starter project with `vcpkg, cmake, glfw, glm, glad, gltf, lodepng, etc`.
 
-### VS2019 (with C++ workload)
+### VS2022 (with C++ workload)
 
 - Install [vcpkg](https://github.com/Microsoft/vcpkg)
-- Either do the `vcpkg integrate install` and "Open a local folder" in VS.
-- Or "Open a local folder", and set the vcpkg CMake toolchain manually in "Project - CMake Settings for project".
+- Add VCPKG_ROOT environment variables pointing to vcpkg.
 
-### VSCode (with CMake and C++ extensions)
-
-- Install [vcpkg](https://github.com/Microsoft/vcpkg)
-- Add toolchain file to workspace properties `.vscode/settings.json`
-
-```json
-{
-  "cmake.configureArgs": [
-    "-DCMAKE_TOOLCHAIN_FILE=C:/src/vcpkg/scripts/buildsystems/vcpkg.cmake"
-  ]
-}
-```
 ### Fonts
 
 Font files are generated using [Hiero](https://github.com/libgdx/libgdx/wiki/Distance-field-fonts) tool.
