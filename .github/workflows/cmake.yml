@@ -23,11 +23,11 @@ jobs:
       uses: lukka/run-cmake@v10
       with:
          configurePreset: 'windows-release'
-         buildPreset: 'ninja-multi-vcpkg'
+         buildPreset: 'windows-release'
     
     - name: Upload artifact
       uses: actions/upload-artifact@v2
       with:
         name: ogls-${{ github.sha }}
-        path: ${{ runner.workspace }}/build/*
+        path: ${{ runner.workspace }}/build/opengl_starter/*
         
