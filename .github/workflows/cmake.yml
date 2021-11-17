@@ -29,12 +29,11 @@ jobs:
       uses: actions/upload-artifact@v2
       with:
         name: ogls-${{ github.sha }}
-        path: ${{ runner.workspace }}/build/opengl_starter/*
+        path: ${{ runner.workspace }}/build/*
     
     - name: Create a Release    
-      uses: elgohr/Github-Release-Action@master
-      env:
-        GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+      uses: ncipollo/release-action@v1
       with:
-        args: TestReleaseMessage
+        artifacts: ogls-${{ github.sha }}
+        token: ${{ secrets.RELEASE_TOKEN }}
         
