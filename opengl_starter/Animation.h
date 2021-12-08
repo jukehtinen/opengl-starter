@@ -32,6 +32,8 @@ namespace opengl_starter
         Interpolation interpolation{ Interpolation::Linear };
         Target target{ Target::None };
 
+        std::string nodeName;
+
         void Animate(float t, opengl_starter::Node* node);
 
         const glm::vec3 Cubic(int previousTimeIndex, int nextTimeIndex, float deltaTime, float interpolationValue) const;
@@ -45,5 +47,7 @@ namespace opengl_starter
         void Animate(float t, opengl_starter::Node* node);
 
         std::vector<Track> tracks;
+
+        float length = 0.0f;
     };
 }

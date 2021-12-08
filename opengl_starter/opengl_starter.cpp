@@ -86,7 +86,7 @@ int main()
     opengl_starter::GltfLoader::Load("assets/cube.glb", nullptr, meshes);
     opengl_starter::GltfLoader::Load("assets/unit_cube.glb", nullptr, meshesCube);
     
-    auto animClockRoot = opengl_starter::GltfLoader::Load("assets/anim_test_clock.glb", &root, meshes);
+    auto animClockRoot = opengl_starter::GltfLoader::Load("assets/anim_test_clock.glb", &root, meshes, true);
     auto animBallRoot = opengl_starter::GltfLoader::Load("assets/anim_test_ball.glb", &root, meshes);
     animClockRoot->pos = glm::vec3{ 11.0f, 0.0f, -2.5f };
     animBallRoot->pos = glm::vec3{ 8.0f, 0.0f, -4.5f };

@@ -18,6 +18,8 @@ namespace opengl_starter
 
     void LoadAnimations(cgltf_data* data, cgltf_node* n, opengl_starter::Node* node)
     {
+        Animation anim;
+
         for (int a = 0; a < data->animations_count; a++)
         {
             const auto& animation = data->animations[a];
@@ -26,7 +28,7 @@ namespace opengl_starter
             {
                 const auto& channel = animation.channels[c];
 
-                if (channel.target_node != n)
+                if (n != nullptr && channel.target_node != n)
                     continue;
 
                 spdlog::info("Animation {}", animation.name);
@@ -34,6 +36,7 @@ namespace opengl_starter
                 const auto& sampler = channel.sampler;
 
                 Track animTrack;
+                animTrack.nodeName = channel.target_node->name;
 
                 std::string pathString;
                 switch (channel.target_path)
@@ -86,15 +89,22 @@ namespace opengl_starter
 
                 spdlog::info("[GltfLoader] Channel target: {} path: {} ip: {} first_ts:{} last_ts:{} Inputs:{} Outputs:{}", channel.target_node->name, pathString, interpolationString, animTrack.times.front(), animTrack.times.back(), sampler->input->count, sampler->output->count);
 
-                Animation animation;
-                animation.tracks.push_back(std::move(animTrack));
-
-                node->animations.push_back(std::move(animation));
+                anim.tracks.push_back(std::move(animTrack));
             }
         }
+
+        float animationTime = 0.0f;
+        for (const auto& track : anim.tracks)
+        {
+            animationTime = std::max(animationTime, track.times.back());
+        }
+        anim.length = animationTime;
+
+        node->animations.push_back(std::move(anim));
     }
 
-    opengl_starter::Node* GltfLoader::Load(const std::string& filename, opengl_starter::Node* parentNode, std::vector<opengl_starter::Mesh*>& outMeshes)
+    opengl_starter::Node* GltfLoader::Load(const std::string& filename, opengl_starter::Node* parentNode, std::vector<opengl_starter::Mesh*>& outMeshes,
+        bool mergeAnimations)
     {
         cgltf_options options = {};
         cgltf_data* data = nullptr;
@@ -110,7 +120,7 @@ namespace opengl_starter
         {
             spdlog::error("[cgltf] cgltf_load_buffers failed to load file {} ({})", filename, result);
             return nullptr;
-        }        
+        }
 
         // Have another vector to avoid name collisions.
         std::vector<opengl_starter::Mesh*> meshes;
@@ -198,13 +208,16 @@ namespace opengl_starter
         opengl_starter::Node* sceneRoot = nullptr;
         if (parentNode != nullptr)
         {
-            auto createNode = [&meshes](cgltf_data* data, opengl_starter::Node* parent, cgltf_node* n, auto& createNodeRef) -> void {
+            auto createNode = [&meshes, &mergeAnimations](cgltf_data* data, opengl_starter::Node* parent, cgltf_node* n, auto& createNodeRef) -> void {
                 auto node = new opengl_starter::Node{ fmt::format("{}", n->name) };
                 node->pos = glm::make_vec3(n->translation);
                 node->scale = glm::make_vec3(n->scale);
                 node->rotq = glm::make_quat(n->rotation);
 
-                LoadAnimations(data, n, node);
+                if (!mergeAnimations)
+                {
+                    LoadAnimations(data, n, node);
+                }
 
                 if (n->mesh != nullptr)
                 {
@@ -229,6 +242,11 @@ namespace opengl_starter
             }
 
             parentNode->children.push_back(sceneRoot);
+        }
+
+        if (mergeAnimations)
+        {
+            LoadAnimations(data, nullptr, sceneRoot);
         }
 
         cgltf_free(data);

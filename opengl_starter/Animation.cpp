@@ -7,8 +7,8 @@ namespace opengl_starter
 {
     void Track::Animate(float t, opengl_starter::Node* node)
     {
-        t = fmodf(t, times[times.size() - 1]);
-        t = glm::clamp(t, times.front(), times.back());
+        //t = glm::clamp(t, times.front(), times.back());
+        t = glm::clamp(t, 0.0f, times.back());
 
         int previousTimeIndex = 0;
         int nextTimeIndex = 0;
@@ -28,6 +28,9 @@ namespace opengl_starter
         const float previousTime = times[previousTimeIndex];
 
         float interpolationValue = (t - previousTime) / (nextTime - previousTime);
+
+        if (nextTimeIndex == previousTimeIndex)
+            interpolationValue = 0.0f;
 
         switch (target)
         {
@@ -142,6 +145,10 @@ namespace opengl_starter
     void Animation::Animate(float t, opengl_starter::Node* node)
     {
         for (auto& track : tracks)
-            track.Animate(t, node);
+        {
+            auto n = node->FindNode(track.nodeName);
+            t = fmodf(t, length);
+            track.Animate(t, n);
+        }
     }
 }
