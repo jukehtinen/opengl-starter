@@ -7,6 +7,7 @@
 #include "Font.h"
 #include "Framebuffer.h"
 #include "GltfLoader.h"
+#include "Grass.h"
 #include "ImGuiHandler.h"
 #include "Mesh.h"
 #include "ParticleSystem.h"
@@ -85,7 +86,7 @@ int main()
     opengl_starter::GltfLoader::Load("assets/atelier.glb", &root, meshes);
     opengl_starter::GltfLoader::Load("assets/cube.glb", nullptr, meshes);
     opengl_starter::GltfLoader::Load("assets/unit_cube.glb", nullptr, meshesCube);
-    
+
     auto animClockRoot = opengl_starter::GltfLoader::Load("assets/anim_test_clock.glb", &root, meshes, true);
     auto animBallRoot = opengl_starter::GltfLoader::Load("assets/anim_test_ball.glb", &root, meshes);
     animClockRoot->pos = glm::vec3{ 11.0f, 0.0f, -2.5f };
@@ -185,6 +186,7 @@ int main()
 
     opengl_starter::SSAO ssao;
     opengl_starter::Bloom bloom;
+    opengl_starter::Grass grass{ root.FindNode("grass")->mesh };
 
     // todo - not cleaned up
     std::vector<opengl_starter::ParticleSystem*> particleSystems;
@@ -251,13 +253,14 @@ int main()
             ps->Update(delta);
 
         imgui.Update(delta);
+        grass.Update(delta, totalTime);
 
         const glm::mat4 projection = glm::perspective(glm::radians(camera.Fov), static_cast<float>(frameWidth) / static_cast<float>(frameHeight), 0.1f, 100.0f);
         const glm::mat4 view = camera.GetViewMatrix();
 
         if (animationManual)
             t = animationPos;
-        else 
+        else
             t += delta;
 
         auto transform = [](opengl_starter::Node* n, const glm::mat4& parentTransform, auto& transformRef, auto& t) -> void {
@@ -288,6 +291,7 @@ int main()
         ssao.OnUI();
         bloom.OnUI();
         particleSystems[0]->OnUI();
+        grass.OnUI();
         DrawSceneUI(&root);
 
         // Render
@@ -384,6 +388,8 @@ int main()
             };
             render(&root, render);
         }
+
+        grass.Render(projection, view);
 
         // PS
         {
@@ -707,6 +713,6 @@ void DrawSceneUI(opengl_starter::Node* node)
     ImGui::DragFloat("Health", &health, 0.01f, 0.0f, 1.0f);
     ImGui::DragFloat3("Light", glm::value_ptr(lightAnglesDeg), 1.0f, 0.0f, 360.0f);
     ImGui::Checkbox("AnimManual", &animationManual);
-    ImGui::DragFloat("animationPos", &animationPos, 0.01f, 0.0f, 100.0f);    
+    ImGui::DragFloat("animationPos", &animationPos, 0.01f, 0.0f, 100.0f);
     ImGui::End();
 }

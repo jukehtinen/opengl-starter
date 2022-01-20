@@ -13,6 +13,7 @@ add_executable (opengl_starter
     "Animation.cpp"
     "DebugDraw.cpp"
     "GltfLoader.cpp"
+    "Grass.cpp"
     "ImGuiHandler.cpp" 
     "opengl_starter.cpp" 
     "ParticleSystem.cpp"

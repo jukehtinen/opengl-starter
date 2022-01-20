@@ -4,6 +4,15 @@
 
 namespace opengl_starter
 {
+    struct ShaderUniform
+    {
+        GLuint shaderType{ 0 };
+        GLenum type{ 0 };
+        GLsizei arraySize{ 0 };
+        std::string name;
+        glm::vec4 value{ 0.0f };
+    };
+
     struct Shader
     {
         Shader(const std::string& vertFile, const std::string& fragFile, const std::string& tesc = "", const std::string& tese = "")
@@ -45,6 +54,11 @@ namespace opengl_starter
             glProgramUniform1f(fragProg, glGetUniformLocation(fragProg, uniform.c_str()), value);
         }
 
+        void SetFloatVs(const std::string& uniform, float value)
+        {
+            glProgramUniform1f(vertProg, glGetUniformLocation(vertProg, uniform.c_str()), value);
+        }
+
         void SetInt(const std::string& uniform, int value)
         {
             glProgramUniform1i(fragProg, glGetUniformLocation(fragProg, uniform.c_str()), value);
@@ -70,7 +84,34 @@ namespace opengl_starter
             glProgramUniform4fv(fragProg, glGetUniformLocation(fragProg, uniform.c_str()), 1, glm::value_ptr(value));
         }
 
-        static GLuint CreateProgram(GLuint type, const std::string& data)
+        const std::vector<ShaderUniform>& GetUniforms()
+        {
+            for (auto& uniform : _uniforms)
+            {
+                switch (uniform.type)
+                {
+                case GL_FLOAT:
+                case GL_FLOAT_VEC2:
+                case GL_FLOAT_VEC3:
+                case GL_FLOAT_VEC4:
+                    glGetUniformfv(vertProg, glGetUniformLocation(vertProg, uniform.name.c_str()), glm::value_ptr(uniform.value));
+                    break;
+                default:
+                    break;
+                }
+            }
+
+            return _uniforms;
+        }
+
+        GLuint vertProg = 0;
+        GLuint fragProg = 0;
+        GLuint tescProg = 0;
+        GLuint teseProg = 0;
+        GLuint pipeline = 0;
+
+    private:
+        GLuint CreateProgram(GLuint type, const std::string& data)
         {
             const auto ptr = static_cast<const GLchar*>(data.c_str());
 
@@ -87,41 +128,38 @@ namespace opengl_starter
                 spdlog::error("[Shader] {}", output.c_str());
 
                 DEBUGGER;
+                return 0;
             }
+
+            ReadUniforms(type, prog);
 
             return prog;
         }
 
-        static void PrintUniforms(GLuint prog)
+        void ReadUniforms(GLuint type, GLuint program)
         {
             GLint uniforms = 0;
-            glGetProgramiv(prog, GL_ACTIVE_UNIFORMS, &uniforms);
+            glGetProgramiv(program, GL_ACTIVE_UNIFORMS, &uniforms);
 
             if (uniforms > 0)
             {
                 GLint maxNameLength = 0;
-                glGetProgramiv(prog, GL_ACTIVE_UNIFORM_MAX_LENGTH, &maxNameLength);
+                glGetProgramiv(program, GL_ACTIVE_UNIFORM_MAX_LENGTH, &maxNameLength);
 
-                GLsizei length = 0;
-                GLsizei count = 0;
-                GLenum type = GL_NONE;
+                GLsizei actualNameLength = 0;
+                GLsizei arraySize = 0;
+                GLenum uniformType = GL_NONE;
                 for (GLint i = 0; i < uniforms; ++i)
                 {
                     std::string name(maxNameLength, '\0');
-                    glGetActiveUniform(prog, i, maxNameLength, &length, &count, &type, name.data());
-                    spdlog::debug("[Shader] Uniform {} {} {}", name, type, count);
+                    glGetActiveUniform(program, i, maxNameLength, &actualNameLength, &arraySize, &uniformType, name.data());
+                    spdlog::debug("[Shader] Uniform {} {} {}", name, uniformType, arraySize);
+                    _uniforms.push_back({ type, uniformType, arraySize, name });
                 }
-            }
-            else
-            {
-                spdlog::debug("[Shader] No uniforms found");
             }
         }
 
-        GLuint vertProg = 0;
-        GLuint fragProg = 0;
-        GLuint tescProg = 0;
-        GLuint teseProg = 0;
-        GLuint pipeline = 0;
+    private:
+        std::vector<ShaderUniform> _uniforms;
     };
 }

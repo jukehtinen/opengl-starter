@@ -48,12 +48,12 @@ namespace Utils
             return static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
         }
 
-        static float RandomFloat(float a, float b)
+        static float RandomFloat(float min, float max)
         {
             float random = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
-            float diff = b - a;
+            float diff = max - min;
             float r = random * diff;
-            return a + r;
+            return min + r;
         }
     }
 
@@ -70,5 +70,13 @@ namespace Utils
 
             return temp;
         }
+    }
+
+    namespace Shapes
+    {
+        static bool ContainsPoint(const glm::vec4& rect, const glm::vec2& pt)
+        {
+            return pt.x >= rect.x && pt.x <= (rect.x + rect.z) && pt.y >= rect.y && pt.y <= (rect.y + rect.w);
+        }        
     }
 }
