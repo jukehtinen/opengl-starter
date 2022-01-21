@@ -19,9 +19,9 @@ jobs:
       with:
         vcpkgGitCommitId: "1a5075baf8e5a1a10fab6282c18587741dcc155e"
 
-    - name: List $RUNNER_WORKSPACE before build
-      run: find $RUNNER_WORKSPACE
-      shell: bash
+#   - name: List $RUNNER_WORKSPACE before build
+#     run: find $RUNNER_WORKSPACE
+#     shell: bash
         
     - name: Run CMake to install the dependencies specified in the vcpkg.json manifest, generate project file and build the project
       uses: lukka/run-cmake@v10
@@ -29,9 +29,9 @@ jobs:
          configurePreset: 'windows-release'
          buildPreset: 'windows-release'
          
-    - name: List $RUNNER_WORKSPACE after build
-      run: find $RUNNER_WORKSPACE
-      shell: bash
+#   - name: List $RUNNER_WORKSPACE after build
+#     run: find $RUNNER_WORKSPACE
+#     shell: bash
     
     - name: Upload artifact
       uses: actions/upload-artifact@v2
