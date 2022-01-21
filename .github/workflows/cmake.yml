@@ -29,7 +29,7 @@ jobs:
          configurePreset: 'windows-release'
          buildPreset: 'windows-release'
          
-    - name: List $RUNNER_WORKSPACE before build
+    - name: List $RUNNER_WORKSPACE after build
       run: find $RUNNER_WORKSPACE
       shell: bash
     
@@ -37,5 +37,5 @@ jobs:
       uses: actions/upload-artifact@v2
       with:
         name: ogls-${{ github.sha }}
-        path: ${{ runner.workspace }}/build/*
+        path: ${{ runner.workspace }}/opengl-starter/out/build/windows-release/opengl_starter/*
         
