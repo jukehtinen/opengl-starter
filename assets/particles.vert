@@ -49,7 +49,7 @@ void main()
 	pos += particles[gl_InstanceID].Param.z * (0.5 - uv.x) * rotateAxis(vec3(0.0, 0.0, 1.0), particles[gl_InstanceID].Param2.y, vec3(1.0, 0.0, 0.0));
     pos += particles[gl_InstanceID].Param.w * (0.5 - uv.y) * rotateAxis(vec3(0.0, 0.0, 1.0), particles[gl_InstanceID].Param2.y, vec3(0.0, 1.0, 0.0));
 		
-	outUv = uv;	
+	outUv = vec2(1.0 - uv.x, uv.y);
 	outLife = clamp(particles[gl_InstanceID].Param.x / particles[gl_InstanceID].Param.y, 0.0, 1.0);
 	outColor = particles[gl_InstanceID].Color;
 	

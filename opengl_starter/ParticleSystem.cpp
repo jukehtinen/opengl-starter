@@ -1,6 +1,7 @@
 ﻿#include "ParticleSystem.h"
 
 #include "Buffer.h"
+#include "DebugDraw.h"
 #include "Node.h"
 #include "Shader.h"
 #include "Texture.h"
@@ -52,6 +53,23 @@ namespace opengl_starter
         emitter.firstUnused++;
 
         return particle;
+    }
+
+    void Modules::BurstSpawner(Emitter& emitter, float delta)
+    {
+        if (emitter.burstDone)
+            return;
+
+        for (int i = 0; i < emitter.maxSpawn; i++)
+        {
+            if (emitter.firstUnused >= emitter.maxParticles)
+                continue;
+
+            auto& particle = InitParticle(emitter);
+
+            particle.Position = glm::vec4{ 0.0f, 0.0f, 0.0f, 1.0f };
+        }
+        emitter.burstDone = true;
     }
 
     void Modules::PointSpawner(Emitter& emitter, float delta)
@@ -208,13 +226,17 @@ namespace opengl_starter
         }
     }
 
-    ParticleSystem::ParticleSystem()
+    ParticleSystem::ParticleSystem(opengl_starter::DebugDraw* debugDraw)
+        : _debugDraw(debugDraw)
     {
         glCreateVertexArrays(1, &_vao);
     }
 
     ParticleSystem::~ParticleSystem()
     {
+        for (auto emitter : _emitters)
+            delete emitter;
+
         glDeleteVertexArrays(1, &_vao);
     }
 
@@ -233,7 +255,7 @@ namespace opengl_starter
         if (!_isRunning)
             return;
 
-        for (auto emitter : emitters)
+        for (auto emitter : _emitters)
         {
             for (auto mod : emitter->modules)
             {
@@ -242,11 +264,17 @@ namespace opengl_starter
         }
     }
 
+    void ParticleSystem::Burst()
+    {
+        for (auto emitter : _emitters)
+            emitter->burstDone = false;        
+    }
+
     void ParticleSystem::Render(const glm::mat4& projection, const glm::mat4& view)
     {
         glEnable(GL_BLEND);
 
-        for (auto emitter : emitters)
+        for (auto emitter : _emitters)
         {
             if (emitter->firstUnused == 0)
                 continue;
@@ -285,12 +313,15 @@ namespace opengl_starter
         }
 
         glDisable(GL_BLEND);
+
+        _debugDraw->DrawCross({}, 0.2f, glm::vec4{ 1.0f }, _emitters[0]->parentNode->model);
     }
 
     Emitter* ParticleSystem::NewEmitter()
     {
         auto emitter = new Emitter();
-        emitters.push_back(emitter);
+        emitter->name = "Emitter";
+        _emitters.push_back(emitter);
         emitter->_particleBuffer = std::make_shared<Buffer>(emitter->maxParticles * sizeof(Particle));
         emitter->_mappedBuffer = glMapNamedBufferRange(emitter->_particleBuffer->buffer, 0, emitter->maxParticles * sizeof(Particle),
             GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
@@ -298,65 +329,124 @@ namespace opengl_starter
         return emitter;
     }
 
-    void ParticleSystem::OnUI()
+    void ParticleSystem::OnUI(const std::vector<std::string>& particleBitmaps)
     {
-        ImGui::Begin("Particles");
-
-        char nameBuffer[128];
+        char nameBuffer[128] = { 0 };
         strncpy_s(nameBuffer, 128, _fileName.c_str(), _fileName.length());
         if (ImGui::InputText("Filename", nameBuffer, 128))
-        {
             _fileName = nameBuffer;
-        }
 
         if (ImGui::Button("Save"))
             Save(_fileName);
 
-        if (ImGui::BeginListBox("Emitters"))
-        {
-            for (int n = 0; n < emitters.size(); n++)
-            {
-                bool selected = (_currentListIndex == n);
-                if (ImGui::Selectable(fmt::format("Emitter {}", n).c_str(), selected))
-                    _currentListIndex = n;
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
 
-                if (selected)
+        if (_emitters.size() == 0)
+            return;
+
+        std::string selectedName = _emitters[_selectedEmitterIndex]->name;
+
+        if (ImGui::BeginCombo("Emitters", selectedName.c_str()))
+        {
+            for (int i = 0; i < _emitters.size(); i++)
+            {
+                const bool isSelected = _selectedEmitterIndex == i;
+                ImGui::PushID(i);
+                if (ImGui::Selectable(_emitters[i]->name.c_str(), isSelected))
+                    _selectedEmitterIndex = i;
+                ImGui::PopID();
+
+                if (isSelected)
                     ImGui::SetItemDefaultFocus();
             }
-            ImGui::EndListBox();
+
+            ImGui::EndCombo();
         }
 
-        if (_currentListIndex != -1)
+        ImGui::Button("New");
+        ImGui::SameLine();
+        ImGui::Button("Delete");
+        ImGui::Spacing();
+
+        auto& emitter = *_emitters[_selectedEmitterIndex];
+
+        ImGui::Spacing();
+
+        char emitterNameBuffer[128] = { 0 };
+        strncpy_s(emitterNameBuffer, 128, emitter.name.c_str(), emitter.name.length());
+        if (ImGui::InputText("Name", emitterNameBuffer, 128))
+            emitter.name = std::string(emitterNameBuffer);
+
+        ImGui::Spacing();
+
+        auto stringGetter = [](void* data, int index, const char** out) -> bool {
+            const auto v = (std::vector<std::string>*)data;
+            *out = v->at(index).c_str();
+            return true;
+        };
+
+        int currentBitmapItem = -1;
+        auto iter = std::find_if(particleBitmaps.begin(), particleBitmaps.end(), [emitter](const std::string& n) { return n == emitter._texture->sourceFile; });
+        if (iter != particleBitmaps.end())
+            currentBitmapItem = std::distance(particleBitmaps.begin(), iter);
+
+        if (ImGui::Combo("Bitmap", &currentBitmapItem, stringGetter, (void*)&particleBitmaps, particleBitmaps.size()))
         {
-            auto& emitter = *emitters[_currentListIndex];
-
-            ImGui::Text(fmt::format("firstUnused {}", emitter.firstUnused).c_str());
-
-            ImGui::DragInt("maxSpawn", &emitter.maxSpawn, 1.0f, 0, 1000);
-            ImGui::DragFloat("spawnRate", &emitter.spawnRate, 0.01f, 0.0f, 10.0f);
-            ImGui::DragFloat2("life", glm::value_ptr(emitter.life), 0.01f, 0.0f, 10.0f);
-            ImGui::DragFloat2("rotation", glm::value_ptr(emitter.rotation), 0.01f, -100.0f, 100.0f);
-            ImGui::DragFloat3("velocityMin", glm::value_ptr(emitter.velocityMin), 0.01f, -100.0f, 100.0f);
-            ImGui::DragFloat3("velocityMax", glm::value_ptr(emitter.velocityMax), 0.01f, -100.0f, 100.0f);
-            ImGui::DragFloat4("gravity", glm::value_ptr(emitter.gravity), 0.01f, -100.0f, 100.0f);
-            ImGui::DragFloat4("size", glm::value_ptr(emitter.size), 0.01f, 0.0f, 100.0f);
-
-            const char* blendModes[] = { "GL_SRC_ALPHA_GL_ONE", "GL_SRC_ALPHA_GL_ONE_MINUS_SRC_ALPHA", "GL_ONE_GL_ONE" };
-
-            ImGui::Spacing();
-            ImGui::Combo("BlendMode", (int*)&emitter.blendMode, blendModes, IM_ARRAYSIZE(blendModes));
-
-            ImGui::Spacing();
-            for (int i = 0; i < emitter.colors.size(); i++)
-            {
-                ImGui::DragFloat(fmt::format("stop{}", i).c_str(), &emitter.colors[i].t);
-                ImGui::ColorEdit4(fmt::format("color{}", i).c_str(), glm::value_ptr(emitter.colors[i].color));
-            }
-
-            if (ImGui::Button("Add"))
-                emitter.colors.emplace_back(ColorStop{});
+            delete emitter._texture;
+            emitter._texture = new opengl_starter::Texture(particleBitmaps[currentBitmapItem]);
         }
-        ImGui::End();
+
+        ImGui::Spacing();
+
+        for (auto mod : emitter.modules)
+        {
+            if (mod == Modules::PointSpawner || mod == Modules::CircleSpawner || mod == Modules::BoxSpawner || mod == Modules::BurstSpawner)
+            {
+                ImGui::DragFloat2("life", glm::value_ptr(emitter.life), 0.01f, 0.0f, 10.0f);
+                ImGui::DragFloat4("size", glm::value_ptr(emitter.size), 0.01f, 0.0f, 100.0f);
+                ImGui::DragFloat2("rotation", glm::value_ptr(emitter.rotation), 0.01f, -100.0f, 100.0f);
+                ImGui::DragFloat3("velocityMin", glm::value_ptr(emitter.velocityMin), 0.01f, -100.0f, 100.0f);
+                ImGui::DragFloat3("velocityMax", glm::value_ptr(emitter.velocityMax), 0.01f, -100.0f, 100.0f);
+
+                ImGui::Text("PointSpawner");
+                ImGui::DragFloat("spawnRate", &emitter.spawnRate, 0.01f, 0.0f, 10.0f);
+                ImGui::DragInt("maxSpawn", &emitter.maxSpawn, 1.0f, 0, 1000);
+            }
+        }
+
+        ImGui::Spacing();
+        for (auto mod : emitter.modules)
+        {
+            if (mod == Modules::BasicUpdater)
+            {
+                ImGui::Text("BasicUpdater");
+                ImGui::DragFloat4("gravity", glm::value_ptr(emitter.gravity), 0.01f, -100.0f, 100.0f);
+            }
+        }
+
+        ImGui::Spacing();
+        const char* blendModes[] = { "GL_SRC_ALPHA_GL_ONE", "GL_SRC_ALPHA_GL_ONE_MINUS_SRC_ALPHA", "GL_ONE_GL_ONE" };
+        ImGui::Combo("BlendMode", (int*)&emitter.blendMode, blendModes, IM_ARRAYSIZE(blendModes));
+
+        ImGui::Spacing();
+        for (int i = 0; i < emitter.colors.size(); i++)
+        {
+            ImGui::DragFloat(fmt::format("stop{}", i).c_str(), &emitter.colors[i].t);
+            ImGui::ColorEdit4(fmt::format("color{}", i).c_str(), glm::value_ptr(emitter.colors[i].color));
+        }
+
+        if (ImGui::Button("Add"))
+            emitter.colors.emplace_back(ColorStop{});
+        ImGui::Spacing();
+
+        if (ImGui::Button("Burst"))
+            Burst();
+
+        ImGui::Spacing();
+
+        ImGui::Text(fmt::format("firstUnused {}", emitter.firstUnused).c_str());
     }
 
     void ParticleSystem::Load(const std::string& fileName, opengl_starter::Node* node)
@@ -364,6 +454,12 @@ namespace opengl_starter
         _fileName = fileName;
 
         std::ifstream i(fileName);
+        if (!i.is_open())
+        {
+            spdlog::error("[ParticleSystem::Load] Failed to open {}", fileName);
+            return;
+        }
+
         nlohmann::json json;
         i >> json;
 
@@ -391,6 +487,7 @@ namespace opengl_starter
 
             emitter->parentNode = node;
 
+            emitter->name = e["name"].get<std::string>();
             emitter->maxSpawn = e["maxSpawn"].get<int>();
             emitter->maxParticles = e["maxParticles"].get<int>();
             emitter->spawnRate = e["spawnRate"].get<float>();
@@ -422,8 +519,10 @@ namespace opengl_starter
                     emitter->modules.push_back(Modules::PointSpawner);
                 else if (name == "BoxSpawner")
                     emitter->modules.push_back(Modules::BoxSpawner);
-                else if (name == "BoxSpawner")
+                else if (name == "CircleSpawner")
                     emitter->modules.push_back(Modules::CircleSpawner);
+                else if (name == "BurstSpawner")
+                    emitter->modules.push_back(Modules::BurstSpawner);
 
                 else if (name == "BasicUpdater")
                     emitter->modules.push_back(Modules::BasicUpdater);
@@ -441,10 +540,11 @@ namespace opengl_starter
     void ParticleSystem::Save(const std::string& fileName)
     {
         auto emitterArray = nlohmann::json::array();
-        for (auto& emitter : emitters)
+        for (auto& emitter : _emitters)
         {
             auto e = nlohmann::json::object();
 
+            e["name"] = emitter->name;
             e["maxSpawn"] = emitter->maxSpawn;
             e["maxParticles"] = emitter->maxParticles;
             e["spawnRate"] = emitter->spawnRate;

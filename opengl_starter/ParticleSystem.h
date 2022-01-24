@@ -4,6 +4,7 @@
 
 namespace opengl_starter
 {
+    class DebugDraw;
     struct Node;
     struct Buffer;
     struct Shader;
@@ -14,6 +15,7 @@ namespace opengl_starter
 
     struct Modules
     {
+        static void BurstSpawner(Emitter& emitter, float delta);
         static void PointSpawner(Emitter& emitter, float delta);
         static void BoxSpawner(Emitter& emitter, float delta);
         static void CircleSpawner(Emitter& emitter, float delta);
@@ -28,8 +30,8 @@ namespace opengl_starter
         glm::vec4 Position{ 0.0f };
         glm::vec4 Velocity{ 0.0f };
         glm::vec4 Color{ 0.0f };
-        glm::vec4 Param{ 0.0f };
-        glm::vec4 Param2{ 0.0f };
+        glm::vec4 Param{ 0.0f };  // life, maxlife, width, height
+        glm::vec4 Param2{ 0.0f }; //rotspeed, rot
     };
 
     struct ColorStop
@@ -49,6 +51,8 @@ namespace opengl_starter
     {
         std::vector<void (*)(Emitter&, float)> modules;
 
+        std::string name;
+
         int maxSpawn = 5;
         int maxParticles = 1000;
         float spawnRate = 0.2f;
@@ -60,7 +64,9 @@ namespace opengl_starter
         glm::vec3 velocityMin = { -1.0f, 1.0f, -1.0f };
         glm::vec3 velocityMax = { 1.0f, 5.0f, 1.0f };
         glm::vec4 gravity = { 0.0f, -9.81f, 0.0f, 0.0f };
-        std::vector<ColorStop> colors;       
+        std::vector<ColorStop> colors;
+
+        bool burstDone{ false };
 
         float spawnCooldown = 0.0f;
         int firstUnused = 0;
@@ -76,7 +82,7 @@ namespace opengl_starter
     class ParticleSystem
     {
     public:
-        ParticleSystem();
+        ParticleSystem(opengl_starter::DebugDraw* debugDraw);
         ~ParticleSystem();
 
         void Start();
@@ -88,6 +94,7 @@ namespace opengl_starter
         }
 
         void Update(float delta);
+        void Burst();
         void Render(const glm::mat4& projection, const glm::mat4& view);
 
         void Load(const std::string& fileName, opengl_starter::Node* node);
@@ -96,17 +103,21 @@ namespace opengl_starter
         Emitter* NewEmitter();
         std::vector<Emitter*>& Emitters()
         {
-            return emitters;
+            return _emitters;
         }
 
-        void OnUI();
+        void OnUI(const std::vector<std::string>& particleBitmaps);
 
     private:
-        std::vector<Emitter*> emitters;
+        std::vector<Emitter*> _emitters;
         float _isRunning = false;
-        GLuint _vao{ 0 };
-        int _currentListIndex = -1;
 
+        GLuint _vao{ 0 };
+
+        // Gui
+        int _selectedEmitterIndex = 0;
         std::string _fileName;
+
+        opengl_starter::DebugDraw* _debugDraw{ nullptr };
     };
 }

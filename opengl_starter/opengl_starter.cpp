@@ -43,7 +43,14 @@ float animationPos = 0.0f;
 bool animationManual = false;
 glm::vec3 lightAnglesDeg = { 340.0f, 317.0f, 127.0f };
 
-void DrawSceneUI(opengl_starter::Node* node);
+std::vector<opengl_starter::ParticleSystem*> particleSystems; // todo - not cleaned up
+std::vector<std::string> particleSystemFiles;
+std::vector<std::string> particleBitmapFiles;
+int selectedParticleSystemFile = -1;
+bool particleSystemEdit = false;
+int particleSystemEditIndex = 0;
+
+void DrawSceneUI(opengl_starter::Node* node, opengl_starter::DebugDraw* debugdraw);
 
 void InitOpenGL()
 {
@@ -69,6 +76,9 @@ int main()
 {
     spdlog::set_level(spdlog::level::debug);
 
+    // (In VS2022, change from 'Debug' -> 'Debug and Launch...' Add "currentDir": "...")
+    spdlog::info("Using working dir: {}", std::filesystem::current_path().string());
+
     const int frameWidth = 2560;
     const int frameHeight = 1440;
     opengl_starter::Window wnd{ frameWidth, frameHeight };
@@ -78,7 +88,11 @@ int main()
     std::vector<opengl_starter::Mesh*> meshes;
     std::vector<opengl_starter::Mesh*> meshesCube;
 
-    auto files = Utils::File::GetFiles("assets/particles");
+    particleBitmapFiles = Utils::File::GetFiles("assets/particles");
+    auto particleBitmaps2 = Utils::File::GetFiles("assets/particles2");
+    particleBitmapFiles.insert(particleBitmapFiles.end(), particleBitmaps2.begin(), particleBitmaps2.end());
+
+    particleSystemFiles = Utils::File::GetFiles("assets", ".ps");
 
     // todo - child nodes are currently allocated and deleted by no one.
     opengl_starter::Node root{ "root" };
@@ -104,7 +118,6 @@ int main()
     opengl_starter::Texture texHealthbar{ "assets/healthbar-gradient.png", opengl_starter::Texture::Wrap::ClampToEdge, opengl_starter::Texture::Wrap::ClampToEdge };
     opengl_starter::Texture texHealthbarMask{ "assets/healthbar-mask.png" };
     opengl_starter::Texture texParticle1{ "assets/particles/flame_01.png" };
-    opengl_starter::Texture texParticle2{ "assets/particles/spark_01.png" };
     auto texNoise = opengl_starter::Texture::CreateNoiseTexture(4, 4);
     opengl_starter::Shader shaderCube("assets/cube.vert", "assets/cube.frag");
     opengl_starter::Shader shaderCubeDepth("assets/cube.vert", "assets/cubeDepth.frag");
@@ -188,17 +201,20 @@ int main()
     opengl_starter::Bloom bloom;
     opengl_starter::Grass grass{ root.FindNode("grass")->mesh };
 
-    // todo - not cleaned up
-    std::vector<opengl_starter::ParticleSystem*> particleSystems;
-    root.RecurseNodes([&particleSystems](opengl_starter::Node* node) {
+    root.RecurseNodes([&debugDraw](opengl_starter::Node* node) {
         if (node->name.find(".particles") != std::string::npos)
         {
-            auto ps = new opengl_starter::ParticleSystem{};
-            ps->Load("assets/ps_torch.json", node);
+            auto ps = new opengl_starter::ParticleSystem{ &debugDraw };
+            ps->Load("assets/ps_torch.ps", node);
             ps->Start();
             particleSystems.push_back(ps);
         }
     });
+
+    auto notesPs = new opengl_starter::ParticleSystem{ &debugDraw };
+    notesPs->Load("assets/ps_notes.ps", root.FindNode("keyboard"));
+    notesPs->Start();
+    particleSystems.push_back(notesPs);
 
     wnd.onResize = [&](int width, int height) {
         textRenderer.ResizeWindow(width, height);
@@ -290,9 +306,8 @@ int main()
         decal.OnDecalUI();
         ssao.OnUI();
         bloom.OnUI();
-        particleSystems[0]->OnUI();
         grass.OnUI();
-        DrawSceneUI(&root);
+        DrawSceneUI(&root, &debugDraw);
 
         // Render
         const float clearColor[4] = { 112.0f / 255.0f, 94.0f / 255.0f, 120.0f / 255.0f, 1.0f };
@@ -648,7 +663,7 @@ int main()
     glDeleteVertexArrays(1, &dummyVao);
 }
 
-void DrawSceneUI(opengl_starter::Node* node)
+void DrawSceneUI(opengl_starter::Node* rootNode, opengl_starter::DebugDraw* debugDraw)
 {
     static opengl_starter::Node* node_clicked = nullptr;
 
@@ -656,7 +671,7 @@ void DrawSceneUI(opengl_starter::Node* node)
 
     if (ImGui::Button("Add"))
     {
-        auto parent = node_clicked ? node_clicked : node;
+        auto parent = node_clicked ? node_clicked : rootNode;
 
         auto n = new opengl_starter::Node{ fmt::format("{}.{}", parent->name, parent->children.size() + 1).c_str() };
         parent->children.push_back(n);
@@ -687,7 +702,7 @@ void DrawSceneUI(opengl_starter::Node* node)
         }
     };
 
-    createNode(node, true, createNode);
+    createNode(rootNode, true, createNode);
 
     ImGui::EndChild();
 
@@ -714,5 +729,54 @@ void DrawSceneUI(opengl_starter::Node* node)
     ImGui::DragFloat3("Light", glm::value_ptr(lightAnglesDeg), 1.0f, 0.0f, 360.0f);
     ImGui::Checkbox("AnimManual", &animationManual);
     ImGui::DragFloat("animationPos", &animationPos, 0.01f, 0.0f, 100.0f);
+    if (ImGui::Button("note burst"))
+        particleSystems[4]->Burst();
+    ImGui::End();
+
+    // Particles
+    ImGui::Begin("Particles");
+    ImGui::SetWindowSize({ 400.0f, 700.0f }, ImGuiCond_FirstUseEver);
+
+    auto stringGetter = [](void* data, int index, const char** out) -> bool {
+        const auto v = (std::vector<std::string>*)data;
+        *out = v->at(index).c_str();
+        return true;
+    };
+    ImGui::Combo("Systems2", &selectedParticleSystemFile, stringGetter, (void*)&particleSystemFiles, particleSystemFiles.size());
+
+    if (ImGui::Button("New"))
+    {
+        particleSystemEdit = true;
+        auto psNode = new opengl_starter::Node{ "new ps" };
+        rootNode->children.push_back(psNode);
+        auto ps = new opengl_starter::ParticleSystem{ debugDraw };
+        ps->Load("assets/ps_default.ps", psNode);
+        ps->Start();
+        particleSystems.push_back(ps);
+        particleSystemEditIndex = particleSystems.size() - 1;
+    }
+    ImGui::SameLine();
+
+    if (ImGui::Button("Open") && selectedParticleSystemFile != -1)
+    {
+        particleSystemEdit = true;
+        auto psNode = new opengl_starter::Node{ particleSystemFiles[selectedParticleSystemFile] };
+        rootNode->children.push_back(psNode);
+        auto ps = new opengl_starter::ParticleSystem{ debugDraw };
+        ps->Load(particleSystemFiles[selectedParticleSystemFile], psNode);
+        ps->Start();
+        particleSystems.push_back(ps);
+        particleSystemEditIndex = particleSystems.size() - 1;
+    }
+
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    if (particleSystemEdit)
+    {
+        particleSystems[particleSystemEditIndex]->OnUI(particleBitmapFiles);
+    }
+
     ImGui::End();
 }

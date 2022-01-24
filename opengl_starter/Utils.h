@@ -8,6 +8,33 @@
 
 namespace Utils
 {
+    namespace String
+    {
+        static std::string ReplaceAll(const std::string& str, const std::string& from, const std::string& to)
+        {
+            std::string copyOfStr = str;
+            size_t index = 0;
+            while ((index = str.find(from, index)) != std::string::npos)
+            {
+                copyOfStr.replace(index, from.length(), to);
+                index += to.length();
+            }
+            return copyOfStr;
+        }
+
+        static std::string Trim(const std::string& str)
+        {
+            const std::string trimmedChars = " ";
+
+            std::string temp = str;
+
+            temp.erase(temp.find_last_not_of(trimmedChars) + 1);
+            temp.erase(0, temp.find_first_not_of(trimmedChars));
+
+            return temp;
+        }
+    }
+
     namespace File
     {
         static std::string LoadText(const std::string& filename)
@@ -30,12 +57,15 @@ namespace Utils
             return output;
         }
 
-        static const std::vector<std::string> GetFiles(const std::string& path)
+        static const std::vector<std::string> GetFiles(const std::string& path, const std::string& ext = "")
         {
             std::vector<std::string> files;
             for (const auto& entry : std::filesystem::directory_iterator(path))
             {
-                files.push_back(entry.path().string());
+                if (ext.length() > 0 && entry.path().extension().string() != ext)
+                    continue;
+
+                files.push_back(String::ReplaceAll(entry.path().string(), "\\", "/"));
             }
             return files;
         }
@@ -57,26 +87,11 @@ namespace Utils
         }
     }
 
-    namespace String
-    {
-        static std::string Trim(const std::string& str)
-        {
-            const std::string trimmedChars = " ";
-
-            std::string temp = str;
-
-            temp.erase(temp.find_last_not_of(trimmedChars) + 1);
-            temp.erase(0, temp.find_first_not_of(trimmedChars));
-
-            return temp;
-        }
-    }
-
     namespace Shapes
     {
         static bool ContainsPoint(const glm::vec4& rect, const glm::vec2& pt)
         {
             return pt.x >= rect.x && pt.x <= (rect.x + rect.z) && pt.y >= rect.y && pt.y <= (rect.y + rect.w);
-        }        
+        }
     }
 }
