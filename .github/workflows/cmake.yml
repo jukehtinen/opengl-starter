@@ -46,10 +46,6 @@ jobs:
         path: ${{ runner.workspace }}/opengl-starter/out/build/windows-release/opengl_starter
         filename: ogls-${{ github.sha }}.zip
         # exclusions: '*.git* /*node_modules/* .editorconfig'
-        
-    - name: List $RUNNER_WORKSPACE after build
-      run: find $RUNNER_WORKSPACE
-      shell: bash
 
     - uses: "marvinpinto/action-automatic-releases@latest"
       with:
