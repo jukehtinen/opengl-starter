@@ -1,6 +1,9 @@
 name: CMake
 
-on: [push]
+on:
+  push:
+    tags-ignore:
+      - latest
 
 env:
   BUILD_TYPE: Release
