@@ -45,7 +45,7 @@ jobs:
         type: 'zip'
         path: ${{ runner.workspace }}/opengl-starter/out/build/windows-release/opengl_starter
         filename: ogls-${{ github.sha }}.zip
-        exclusions: '*.cmake *.exp *.lib CMakeFiles/*'
+        exclusions: '*.cmake* *.exp* *.lib* /*CMakeFiles/*'
 
     - uses: "marvinpinto/action-automatic-releases@latest"
       with:
