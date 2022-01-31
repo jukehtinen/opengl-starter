@@ -33,22 +33,30 @@ jobs:
 #     run: find $RUNNER_WORKSPACE
 #     shell: bash
     
-    - name: Upload artifact
-      uses: actions/upload-artifact@v2
+#    - name: Upload artifact
+#      uses: actions/upload-artifact@v2
+#      with:
+#        name: ogls-${{ github.sha }}
+#        path: ${{ runner.workspace }}/opengl-starter/out/build/windows-release/opengl_starter/*
+    
+    - name: Archive Release
+      uses: thedoctor0/zip-release@master
       with:
-        name: ogls-${{ github.sha }}
-        path: ${{ runner.workspace }}/opengl-starter/out/build/windows-release/opengl_starter/*
-   
+        type: 'zip'
+        path: ${{ runner.workspace }}/opengl-starter/out/build/windows-release/opengl_starter
+        filename: ogls-${{ github.sha }}.zip
+        # exclusions: '*.git* /*node_modules/* .editorconfig'
+        
     - name: List $RUNNER_WORKSPACE after build
       run: find $RUNNER_WORKSPACE
       shell: bash
 
- #   - uses: "marvinpinto/action-automatic-releases@latest"
- #     with:
- #       repo_token: "${{ secrets.RELEASE_TOKEN }}"
- #       automatic_release_tag: "latest"
- #       prerelease: true
- #       title: "Development Build"
- #       files: |
- #         LICENSE.txt
- #
+    - uses: "marvinpinto/action-automatic-releases@latest"
+      with:
+        repo_token: "${{ secrets.RELEASE_TOKEN }}"
+        automatic_release_tag: "latest"
+        prerelease: true
+        title: "Development Build"
+        files: |
+          ogls-${{ github.sha }}.zip
+ 
