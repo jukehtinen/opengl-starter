@@ -38,4 +38,10 @@ jobs:
       with:
         name: ogls-${{ github.sha }}
         path: ${{ runner.workspace }}/opengl-starter/out/build/windows-release/opengl_starter/*
-        
+       
+    - name: Create a Release
+      uses: elgohr/Github-Release-Action@master
+      env:
+        GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+      with:
+        args: Build ${{ steps.vars.outputs.sha_short }}
